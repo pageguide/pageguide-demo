@@ -1,0 +1,92 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+.dark {
+  color-scheme: dark;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+}
+body {
+  background: theme('colors.cream');
+  color: theme('colors.ink');
+  font-family: theme('fontFamily.sans');
+  -webkit-font-smoothing: antialiased;
+}
+.dark body {
+  background: theme('colors.night.DEFAULT');
+  color: theme('colors.night.ink');
+}
+
+/* Grounding highlights, shared by both surfaces */
+.pg-evidence {
+  background: #fff0b3 !important;
+  box-shadow: 0 0 0 2px #e1b75d;
+  border-radius: 4px;
+  color: #5b531f !important;
+  scroll-margin: 80px;
+}
+.dark .pg-evidence {
+  background: #4a431d !important;
+  color: #f6ecc4 !important;
+  box-shadow: 0 0 0 2px #b9933f;
+}
+.pg-guide {
+  box-shadow: 0 0 0 3px theme('colors.orange.DEFAULT');
+  background: #fff6ee !important;
+  border-radius: 6px;
+  scroll-margin: 100px;
+}
+.pg-visual {
+  box-shadow: 0 0 0 3px #3b82f6;
+  border-radius: 6px;
+  scroll-margin: 90px;
+}
+.dark .pg-guide {
+  background: #3a2c1f !important;
+}
+
+/* thin scrollbars */
+.pg-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #cdcdc2 transparent;
+}
+.pg-scroll::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+.pg-scroll::-webkit-scrollbar-thumb {
+  background: #cdcdc2;
+  border-radius: 10px;
+}
+.dark .pg-scroll {
+  scrollbar-color: #40463a transparent;
+}
+.dark .pg-scroll::-webkit-scrollbar-thumb {
+  background: #40463a;
+}
+
+/* Chat composer: no scrollbars (the stray horizontal bar), just a clean box */
+.composer-input {
+  scrollbar-width: none;
+}
+.composer-input::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto !important;
+    transition: none !important;
+    animation: none !important;
+  }
+}
