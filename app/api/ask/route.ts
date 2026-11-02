@@ -89,7 +89,10 @@ export async function POST(req: NextRequest) {
   });
 
   // For Find, send up to 4 page images so the vision model can return a bounding box.
-  const imageBlocks = blocks.filter((b) => b.type === 'image' && b.src).slice(0, 4);
+  // Only formats the vision API accepts (png/jpeg/gif/webp) — others cause a 400.
+  const imageBlocks = blocks
+    .filter((b) => b.type === 'image' && b.src && /\.(png|jpe?g|gif|webp)(\?|#|$)/i.test(b.src))
+    .slice(0, 4);
   const userMessage =
     mode === 'find' && imageBlocks.length
       ? {
@@ -115,20 +118,27 @@ export async function POST(req: NextRequest) {
       headers['HTTP-Referer'] = 'https://pageguide.vercel.app';
       headers['X-Title'] = 'PageGuide Demo';
     }
-    const res = await fetch(PROVIDERS[provider].endpoint, {
-      method: 'POST',
-      signal: controller.signal,
-      headers,
-      body: JSON.stringify({
-        model,
-        temperature: 0,
-        max_tokens: 900,
-        response_format: { type: 'json_object' },
-        // OpenRouter returns exact cost when usage accounting is requested.
-        ...(provider === 'openrouter' ? { usage: { include: true } } : {}),
-        messages: [{ role: 'system', content: SYSTEM }, userMessage],
-      }),
-    });
+    const call = (um: typeof userMessage) =>
+      fetch(PROVIDERS[provider].endpoint, {
+        method: 'POST',
+        signal: controller.signal,
+        headers,
+        body: JSON.stringify({
+          model,
+          temperature: 0,
+          max_tokens: 900,
+          response_format: { type: 'json_object' },
+          // OpenRouter returns exact cost when usage accounting is requested.
+          ...(provider === 'openrouter' ? { usage: { include: true } } : {}),
+          messages: [{ role: 'system', content: SYSTEM }, um],
+        }),
+      });
+
+    let res = await call(userMessage);
+    // If an image was rejected (e.g. unsupported format), retry text-only so Find still works.
+    if (!res.ok && res.status === 400 && Array.isArray(userMessage.content)) {
+      res = await call({ role: 'user' as const, content: userJson });
+    }
 
     if (!res.ok) {
       const map: Record<number, string> = {
