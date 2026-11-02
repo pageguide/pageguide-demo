@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="An interactive, anonymous PageGuide demo. Find answers, follow on-page guidance, and hide distractions. No installation or account needed.">
+  <meta name="theme-color" content="#faf9f6">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src https://api.openai.com; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>PageGuide — A little guidance. A better web.</title>
+  <link rel="icon" href="assets/mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="site-header wrap">
+    <a class="brand" href="#" aria-label="PageGuide home"><img src="assets/mark.svg" width="32" height="32" alt="">PageGuide<span class="demo-label">DEMO</span></a>
+    <nav aria-label="Main navigation"><a href="#playground">Playground</a><a href="#how-it-works">How it works</a><button class="button small" data-start>Try it yourself <span aria-hidden="true">↗</span></button></nav>
+  </header>
+
+  <main>
+    <section class="hero wrap">
+      <div class="eyebrow"><span class="status-dot"></span> YOUR BROWSER, WITH A LITTLE SUPERPOWER</div>
+      <h1>Less searching.<br>More <span class="serif">getting there.</span><svg class="hero-spark" width="46" height="54" viewBox="0 0 46 54" aria-hidden="true"><path d="m23 3 2 17 16-7-12 14 14 9-18-3-4 18-3-19L3 37l11-13L3 13l16 7Z" fill="#e78959"/></svg></h1>
+      <p>Meet PageGuide, the browser companion that finds what matters,<br class="desktop-break"> shows you the next step, and clears the clutter. Right on the page.</p>
+      <div class="hero-actions"><a class="button" href="#playground" data-start>Give it a try <span aria-hidden="true">↓</span></a><span class="no-install"><span aria-hidden="true">◌</span> No install. No sign-up. Just explore.</span></div>
+      <div class="hero-note"><span class="note-line" aria-hidden="true">⤵</span> A hands-on demo, not another video.</div>
+    </section>
+
+    <section id="playground" class="playground wrap" aria-labelledby="playground-heading">
+      <div class="section-heading"><div><span class="eyebrow">THE INTERACTIVE PLAYGROUND</span><h2 id="playground-heading">A familiar page. A new way to browse.</h2></div><span class="local-badge"><span class="status-dot"></span> Runs locally in your browser</span></div>
+      <div class="mode-bar" role="tablist" aria-label="PageGuide features">
+        <button id="tab-find" role="tab" aria-selected="true" aria-controls="demo-panel" data-mode="find"><span aria-hidden="true">⌕</span> Find <small>Get to the answer</small></button>
+        <button id="tab-guide" role="tab" aria-selected="false" aria-controls="demo-panel" tabindex="-1" data-mode="guide"><span aria-hidden="true">↗</span> Guide <small>Know your next step</small></button>
+        <button id="tab-hide" role="tab" aria-selected="false" aria-controls="demo-panel" tabindex="-1" data-mode="hide"><span aria-hidden="true">◈</span> Hide <small>Make room to focus</small></button>
+        <button id="tab-more" role="tab" aria-selected="false" aria-controls="demo-panel" tabindex="-1" data-mode="more"><span aria-hidden="true">✧</span> And more <small>Images, PDFs & answers</small></button>
+      </div>
+      <div class="browser" id="demo-panel" role="tabpanel" aria-labelledby="tab-find">
+        <div class="browser-chrome"><div class="traffic" aria-hidden="true"><i></i><i></i><i></i></div><div class="address"><span aria-hidden="true">▣</span><span id="demo-url">fieldnotes.example / journal / a-weekend-outside</span></div><span class="browser-extension" title="Simulated PageGuide panel"><img src="assets/mark.svg" width="22" height="22" alt="PageGuide"></span></div>
+        <div class="browser-body">
+          <div class="sample-viewport" id="sample-viewport" tabindex="0" aria-label="Example webpage">
+            <div id="sample-page"></div>
+          </div>
+          <aside class="assistant" aria-label="Simulated PageGuide side panel">
+            <div class="assistant-header"><div class="brand"><img src="assets/mark.svg" width="25" height="25" alt="">PageGuide</div><button id="reset" class="icon-button" title="Reset this demo" aria-label="Reset this demo">↻</button></div>
+            <div class="simulation-label"><span class="status-dot"></span> INTERACTIVE SIMULATION</div>
+            <div id="conversation" class="conversation" aria-live="polite" aria-atomic="false"></div>
+            <div class="composer-area">
+              <div class="page-context"><span id="context-label"><span class="context-dot"></span> Page context on</span><span class="scripted">Scripted demo</span></div>
+              <form id="prompt-form"><label for="prompt" class="sr-only">Ask PageGuide about the demo page</label><div class="composer"><input id="prompt" type="text" autocomplete="off" maxlength="300" placeholder="Ask about this page…"><button type="submit" aria-label="Send message">↑</button></div></form>
+              <p class="composer-note">Demo responses only · No data is sent</p>
+            </div>
+          </aside>
+        </div>
+      </div>
+      <details class="live-settings" id="live-settings">
+        <summary>Want real AI? Connect your OpenAI key <span id="live-status" class="live-status">· optional</span></summary>
+        <p class="live-disclosure">Live mode supports Find and Guide on these fictional pages. Your question and the visible demo content are sent directly to OpenAI. Your key stays in memory in this tab, is sent only to OpenAI, and is cleared on reload or disconnect. API usage may incur charges. Never use a shared or production key on a public demo.</p>
+        <form id="connect-form" class="settings-fields">
+          <label>OpenAI API key<input type="password" id="api-key" placeholder="sk-…" autocomplete="off" spellcheck="false" required></label>
+          <label>Model<select id="model"><option value="gpt-4.1-mini">gpt-4.1-mini</option><option value="gpt-4.1">gpt-4.1</option><option value="gpt-4o-mini">gpt-4o-mini</option></select></label>
+          <button class="sample-button primary" type="submit">Enable live mode</button><button class="sample-button" type="button" id="disconnect">Disconnect</button>
+          <label class="consent-label"><input id="api-consent" type="checkbox" required>I agree to send this demo's content and my prompts to OpenAI using my key.</label>
+        </form>
+        <p id="connection-message" class="live-status" role="status"></p>
+      </details>
+      <div class="demo-caption"><span><span class="keyboard-icon" aria-hidden="true">✦</span> <strong>You're in control.</strong> Try a suggested prompt, then interact with the page.</span><span id="demo-count">01 / 04</span></div>
+    </section>
+
+    <section id="how-it-works" class="how-section wrap" aria-labelledby="how-heading">
+      <div class="section-intro"><span class="eyebrow">HELP THAT MEETS YOU WHERE YOU ARE</span><h2 id="how-heading">The web is full of possibilities.<br>And a few too many tabs.</h2><p>PageGuide brings the answer back to the source.<br>No switching windows. No losing your place.</p></div>
+      <div class="feature-grid">
+        <article><div class="feature-icon peach">⌕</div><span class="feature-number">01 / FIND</span><h3>Don't hunt. Just ask.</h3><p>Ask in your own words. PageGuide highlights the passage that answers your question, so you can see it in context.</p><button class="text-button" data-jump="find">Find an answer <span aria-hidden="true">↗</span></button></article>
+        <article><div class="feature-icon green">↗</div><span class="feature-number">02 / GUIDE</span><h3>A next step, not a guess.</h3><p>Get step-by-step instructions attached to the right buttons and fields. You set the pace and stay in control.</p><button class="text-button" data-jump="guide">Follow a walkthrough <span aria-hidden="true">↗</span></button></article>
+        <article><div class="feature-icon lavender">◈</div><span class="feature-number">03 / HIDE</span><h3>A little less everything.</h3><p>Hide ads, sidebars, and distractions to make space for what you came to read. Bring them back whenever you like.</p><button class="text-button" data-jump="hide">Clear the clutter <span aria-hidden="true">↗</span></button></article>
+      </div>
+    </section>
+
+    <section class="privacy-section wrap"><div class="privacy-symbol" aria-hidden="true">◎</div><div><span class="eyebrow">JUST A DEMO. JUST FOR YOU.</span><h2>Curiosity shouldn't need an account.</h2><p>Explore fictional pages with no sign-in, cookies, or analytics. Simulation mode sends no data. Optional live Find and Guide use your own OpenAI key and send demo content directly to OpenAI.</p></div><span class="privacy-tag">100% client-side <span aria-hidden="true">↗</span></span></section>
+
+    <section class="faq-section wrap" aria-labelledby="faq-heading"><h2 id="faq-heading">A few things to know.</h2><div class="faq-list"><details><summary>Is this the actual browser extension?</summary><p>No. This is a standalone demonstration of PageGuide's core interactions, with scripted responses by default and optional live OpenAI-powered Find and Guide. It works only on the fictional pages inside this demo; it does not read other tabs or control your browser.</p></details><details><summary>Can I ask any question in the playground?</summary><p>Simulation mode recognizes a small set of topics and uses pre-written responses. Use the suggested prompts for the full experience, or connect your own OpenAI API key below the playground for live Find and Guide. Live answers may be inaccurate; always check the highlighted source.</p></details><details><summary>What can the real extension do?</summary><p>PageGuide can find and highlight answers, guide you through tasks, hide distracting elements, match an image on a page, and answer questions about PDFs. With page context off, it can also answer general-knowledge questions.</p></details><details><summary>Does the real extension need setup?</summary><p>Yes. The extension supports Chrome and Edge. It requires installation and configuration of a supported AI provider with an API key. That setup is not needed for this simulated playground. Actual extension data handling depends on your selected provider and configuration.</p></details></div></section>
+  </main>
+  <footer class="wrap"><a class="brand" href="#"><img src="assets/mark.svg" width="25" height="25" alt="">PageGuide</a><span>A little guidance goes a long way.</span><span>Anonymous demonstration · No tracking</span></footer>
+  <noscript><p class="noscript">Enable JavaScript to use the interactive playground. This demo runs entirely in your browser.</p></noscript>
+</body>
+</html>

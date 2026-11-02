@@ -1,0 +1,13 @@
+{
+  "name": "pageguide-demo",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Anonymous, static PageGuide playground",
+  "scripts": {
+    "start": "python3 -m http.server 8080 --bind 127.0.0.1",
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0"
+  }
+}
