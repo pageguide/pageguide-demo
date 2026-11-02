@@ -62,7 +62,10 @@ interface StoreState {
   history: SavedChat[];
   historyOpen: boolean;
 
+  serverKeys: { openai: boolean; openrouter: boolean };
+
   hydrate: () => void;
+  loadConfig: () => Promise<void>;
   setSurface: (s: Surface) => void;
   patchSettings: (p: Partial<Settings>) => void;
   toggleDark: () => void;
@@ -173,6 +176,17 @@ export const useStore = create<StoreState>((set, get) => ({
 
   history: [],
   historyOpen: false,
+
+  serverKeys: { openai: false, openrouter: false },
+
+  loadConfig: async () => {
+    try {
+      const res = await fetch('/api/config');
+      if (res.ok) set({ serverKeys: await res.json() });
+    } catch {
+      /* ignore */
+    }
+  },
 
   hydrate: () => {
     if (get().hydrated) return;

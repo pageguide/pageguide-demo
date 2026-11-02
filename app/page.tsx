@@ -9,12 +9,14 @@ import TerminalSurface from '@/components/surfaces/TerminalSurface';
 
 export default function Home() {
   const hydrate = useStore((s) => s.hydrate);
+  const loadConfig = useStore((s) => s.loadConfig);
   const surface = useStore((s) => s.surface);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     hydrate();
-  }, [hydrate]);
+    void loadConfig();
+  }, [hydrate, loadConfig]);
 
   return (
     <div className="flex h-[100dvh] flex-col">
