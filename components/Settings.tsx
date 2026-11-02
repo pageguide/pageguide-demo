@@ -8,6 +8,7 @@ import type { Provider } from '@/lib/types';
 export default function Settings({ onClose }: { onClose: () => void }) {
   const settings = useStore((s) => s.settings);
   const patch = useStore((s) => s.patchSettings);
+  const serverKeys = useStore((s) => s.serverKeys);
   const [provider, setProvider] = useState<Provider>(settings.provider);
   const [openaiModel, setOpenaiModel] = useState(settings.openaiModel);
   const [openrouterModel, setOpenrouterModel] = useState(settings.openrouterModel);
@@ -68,14 +69,27 @@ export default function Settings({ onClose }: { onClose: () => void }) {
           />
         )}
 
+        {serverKeys[provider] && (
+          <div className="mb-3 rounded-lg border border-sage/40 bg-sage-soft/60 px-3 py-2 text-[11px] text-sage dark:border-night-line dark:bg-night dark:text-[#a9bb95]">
+            ✓ A server key is configured for {PROVIDERS[provider].label} — you can leave the key blank; the app won&apos;t
+            ask visitors for one.
+          </div>
+        )}
+
         {provider === 'openai' ? (
-          <Field label="OpenAI API key" value={openaiKey} onChange={setOpenaiKey} placeholder="sk-…" password />
+          <Field
+            label={`OpenAI API key${serverKeys.openai ? ' (optional)' : ''}`}
+            value={openaiKey}
+            onChange={setOpenaiKey}
+            placeholder={serverKeys.openai ? 'Using server key' : 'sk-…'}
+            password
+          />
         ) : (
           <Field
-            label="OpenRouter API key"
+            label={`OpenRouter API key${serverKeys.openrouter ? ' (optional)' : ''}`}
             value={openrouterKey}
             onChange={setOpenrouterKey}
-            placeholder="sk-or-…"
+            placeholder={serverKeys.openrouter ? 'Using server key' : 'sk-or-…'}
             password
           />
         )}
