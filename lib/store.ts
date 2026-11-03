@@ -51,6 +51,8 @@ interface StoreState {
   pageError: string | null;
   results: SearchResult[] | null;
   query: string;
+  navStack: string[];
+  navIndex: number;
 
   messages: ChatMessage[];
   busy: boolean;
@@ -77,7 +79,9 @@ interface StoreState {
   toggleDark: () => void;
   setAuto: (a: AutoMode) => void;
 
-  loadUrl: (input: string) => Promise<void>;
+  loadUrl: (input: string, opts?: { push?: boolean }) => Promise<void>;
+  goBack: () => void;
+  goForward: () => void;
   search: (query: string) => Promise<void>;
   openResult: (url: string) => Promise<void>;
   ask: (question: string, forced?: Mode) => Promise<void>;
@@ -173,6 +177,8 @@ export const useStore = create<StoreState>((set, get) => ({
   pageError: null,
   results: null,
   query: '',
+  navStack: [],
+  navIndex: -1,
 
   messages: [],
   busy: false,
@@ -239,9 +245,10 @@ export const useStore = create<StoreState>((set, get) => ({
   toggleDark: () => get().patchSettings({ dark: !get().settings.dark }),
   setAuto: (a) => set({ auto: a }),
 
-  loadUrl: async (input) => {
+  loadUrl: async (input, opts) => {
     const url = stripCmd(input);
     if (!url) return;
+    const push = opts?.push !== false;
     set({
       browserView: 'loading',
       pageError: null,
@@ -262,9 +269,17 @@ export const useStore = create<StoreState>((set, get) => ({
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Could not load the page.');
       const doc = data as PageDoc;
+      // navigation history
+      let { navStack, navIndex } = get();
+      if (push) {
+        navStack = navStack.slice(0, navIndex + 1).concat(doc.url);
+        navIndex = navStack.length - 1;
+      }
       set({
         doc,
         browserView: 'page',
+        navStack,
+        navIndex,
         messages: [
           ...get().messages,
           {
@@ -278,6 +293,21 @@ export const useStore = create<StoreState>((set, get) => ({
       const msg = e instanceof Error ? e.message : 'Could not load the page.';
       set({ browserView: 'empty', doc: null, pageError: msg });
     }
+  },
+
+  goBack: () => {
+    const { navStack, navIndex } = get();
+    if (navIndex <= 0) return;
+    const i = navIndex - 1;
+    set({ navIndex: i });
+    void get().loadUrl(navStack[i], { push: false });
+  },
+  goForward: () => {
+    const { navStack, navIndex } = get();
+    if (navIndex >= navStack.length - 1) return;
+    const i = navIndex + 1;
+    set({ navIndex: i });
+    void get().loadUrl(navStack[i], { push: false });
   },
 
   search: async (raw) => {
@@ -460,6 +490,8 @@ export const useStore = create<StoreState>((set, get) => ({
     set({
       doc: chat.doc,
       browserView: chat.doc ? 'page' : 'empty',
+      navStack: chat.url ? [chat.url] : [],
+      navIndex: chat.url ? 0 : -1,
       messages: (chat.messages as ChatMessage[]) || [],
       evidence: [],
       focusedEvidence: null,
@@ -492,6 +524,8 @@ export const useStore = create<StoreState>((set, get) => ({
       results: null,
       pageError: null,
       query: '',
+      navStack: [],
+      navIndex: -1,
       messages: [],
       evidence: [],
       focusedEvidence: null,

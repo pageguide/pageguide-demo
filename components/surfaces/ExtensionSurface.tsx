@@ -24,6 +24,10 @@ export default function ExtensionSurface({ onOpenSettings }: { onOpenSettings: (
     fieldValues,
     clicked,
     loadUrl,
+    goBack,
+    goForward,
+    navStack,
+    navIndex,
     search,
     openResult,
     performStep,
@@ -63,6 +67,26 @@ export default function ExtensionSurface({ onOpenSettings }: { onOpenSettings: (
             <i className="h-2.5 w-2.5 rounded-full bg-[#e1b8a6]" />
             <i className="h-2.5 w-2.5 rounded-full bg-[#e0d0a0]" />
             <i className="h-2.5 w-2.5 rounded-full bg-[#bdcdb0]" />
+          </div>
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={goBack}
+              disabled={navIndex <= 0}
+              title="Back"
+              aria-label="Back"
+              className="flex h-6 w-6 items-center justify-center rounded-md text-[15px] text-muted enabled:hover:bg-line/50 enabled:hover:text-ink disabled:opacity-30 dark:text-night-muted dark:enabled:hover:text-night-ink"
+            >
+              ‹
+            </button>
+            <button
+              onClick={goForward}
+              disabled={navIndex >= navStack.length - 1}
+              title="Forward"
+              aria-label="Forward"
+              className="flex h-6 w-6 items-center justify-center rounded-md text-[15px] text-muted enabled:hover:bg-line/50 enabled:hover:text-ink disabled:opacity-30 dark:text-night-muted dark:enabled:hover:text-night-ink"
+            >
+              ›
+            </button>
           </div>
           <div className="flex flex-1 items-center gap-2 rounded-lg border border-line bg-white px-3 py-1.5 dark:border-night-line dark:bg-night-panel">
             <span className="text-[11px] text-muted">🔎</span>
