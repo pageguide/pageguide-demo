@@ -21,6 +21,7 @@ export default function ExtensionSurface({ onOpenSettings }: { onOpenSettings: (
     evidence,
     focusedEvidence,
     guide,
+    guideRun,
     fieldValues,
     clicked,
     loadUrl,
@@ -30,7 +31,6 @@ export default function ExtensionSurface({ onOpenSettings }: { onOpenSettings: (
     navIndex,
     search,
     openResult,
-    performStep,
     setFieldValue,
     focusEvidence,
   } = useStore();
@@ -52,7 +52,7 @@ export default function ExtensionSurface({ onOpenSettings }: { onOpenSettings: (
 
   const evidenceIds = new Set(evidence.map((e) => e.id));
   const onBlockClick = (b: Block) => {
-    if (guideTarget && b.id === guideTarget) return performStep();
+    if (guideRun?.running) return; // the agent is driving — ignore manual clicks
     if (evidenceIds.has(b.id)) return focusEvidence(b.id); // clicking a highlight focuses it
     if (b.type === 'link' && b.href) void loadUrl(b.href);
   };

@@ -84,13 +84,35 @@ export interface FindResult {
   debug?: AskDebug;
 }
 
-export type GuideAction = 'open' | 'click' | 'fill';
+export type GuideAction = 'open' | 'click' | 'fill' | 'observe';
 
 export interface GuideStep {
   id: string;
   instruction: string;
-  action?: GuideAction; // open (navigate link) | click (button) | fill (input)
+  action?: GuideAction; // open (navigate link) | click (button) | fill (input) | observe
   value?: string; // text to type for a fill action
+  // the agent may emit an action AND save evidence at the same step
+  evidence?: { name: string; imageId?: string; annotate?: string };
+}
+
+// A saved piece of evidence in the agent's scratchpad (ev:<name>), with an image.
+export interface Evidence {
+  name: string; // e.g. "orange-added-to-cart"
+  index: number; // 1-based badge number
+  imageUrl: string;
+  box?: [number, number, number, number]; // annotation bounding box (normalized)
+  caption?: string;
+}
+
+export interface AnnotateResult {
+  box: [number, number, number, number] | null;
+  caption?: string;
+}
+
+export interface GuideSummary {
+  status: 'Completed' | 'Incomplete' | 'Failed';
+  answer: string; // may contain [EV:name] references, rendered as 📷 badges
+  reasoning: string; // the reasoning-trail text
 }
 
 export interface GuideResult {

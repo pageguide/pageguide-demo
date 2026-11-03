@@ -12,6 +12,7 @@ const DOC = {
     { id: 'n3', type: 'heading', text: 'Book your visit', level: 2 },
     { id: 'n4', type: 'input', text: 'Email address', control: true },
     { id: 'n5', type: 'button', text: 'Start booking', control: true },
+    { id: 'n6', type: 'image', text: 'Confirmation', src: 'https://example.com/confirm.png' },
   ],
 };
 
@@ -47,39 +48,48 @@ test('loads a page and Find highlights the grounded passage', async ({ page }) =
   await expect(page.locator('text=Visit in late spring').first()).toBeVisible();
 });
 
-test('Guide performs real actions (fill then click) step by step', async ({ page }) => {
+test('Guide runs the autonomous agent loop, saves evidence, and summarizes', async ({ page }) => {
   await mockFetch(page);
-  await page.route('**/api/ask', (r) =>
+  let agentCall = 0;
+  await page.route('**/api/agent', (r) => {
+    agentCall++;
+    if (agentCall === 1)
+      return r.fulfill({
+        json: {
+          instruction: 'Click Start booking.',
+          action: { type: 'click', id: 'n5' },
+          evidence: { name: 'booking-started', imageId: 'n6', annotate: 'the confirmation' },
+        },
+      });
+    return r.fulfill({ json: { instruction: 'Confirm the task is complete.', action: { type: 'finish' } } });
+  });
+  await page.route('**/api/annotate', (r) => r.fulfill({ json: { box: [0.1, 0.1, 0.3, 0.3], caption: 'confirmed' } }));
+  await page.route('**/api/summarize', (r) =>
     r.fulfill({
       json: {
-        kind: 'guide',
-        answer: 'Here is how to book.',
-        steps: [
-          { id: 'n4', instruction: 'Enter your email.', action: 'fill', value: 'demo@example.com' },
-          { id: 'n5', instruction: 'Click Start booking.', action: 'click' },
-        ],
+        status: 'Completed',
+        answer: 'The task is complete and confirmed by the evidence [EV:booking-started].',
+        reasoning: 'Clicked the booking button and verified the confirmation.',
       },
     }),
   );
   await loadPage(page);
-  // Use "Ask" mode so steps don't auto-advance.
-  await page.getByRole('button', { name: /Auto:/ }).click();
-  await page.getByText('Ask — confirm each step').click();
 
-  await page.fill('textarea', 'How do I book a visit?');
+  await page.fill('textarea', '/guide start a booking');
   await page.keyboard.press('Enter');
-  await expect(page.locator('[data-node-id="n4"]')).toHaveClass(/pg-guide/);
-  await expect(page.getByText('Step 1 of 2')).toBeVisible();
 
-  // perform step 1 (fill) — the field gets the value
-  await page.getByRole('button', { name: /Do this step/ }).click();
-  await expect(page.getByText(/Typed .* into/)).toBeVisible();
-  await expect(page.locator('[data-node-id="n5"]')).toHaveClass(/pg-guide/);
+  // task card appears with the task title
+  await expect(page.getByText('start a booking').first()).toBeVisible();
+  await expect(page.getByText('View Journey')).toBeVisible();
 
-  // perform step 2 (click) — the button shows done, walkthrough completes
-  await page.getByRole('button', { name: /Do this step/ }).click();
-  await expect(page.getByText(/Clicked/)).toBeVisible();
-  await expect(page.getByText('Walkthrough complete')).toBeVisible();
+  // the summarizer produces the final Answer card with status + evidence badge
+  await expect(page.getByText('Completed')).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText(/task is complete/i)).toBeVisible();
+  await expect(page.getByRole('button', { name: /📷\s*1/ })).toBeVisible();
+
+  // opening the evidence shows its annotated screenshot
+  await page.getByRole('button', { name: /📷\s*1/ }).click();
+  await expect(page.getByText('ev:booking-started')).toBeVisible();
 });
 
 test('saved chat history: save, reload a fresh session, and open it', async ({ page }) => {

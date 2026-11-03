@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { useStore, currentModel } from '@/lib/store';
+import { useStore, currentModel, type GuideRun } from '@/lib/store';
 import { PROVIDERS, prettyModel } from '@/lib/providers';
+import type { Evidence } from '@/lib/types';
 
 export default function SidePanel({ onOpenSettings }: { onOpenSettings: () => void }) {
   const {
@@ -12,13 +13,11 @@ export default function SidePanel({ onOpenSettings }: { onOpenSettings: () => vo
     doc,
     messages,
     busy,
-    guide,
     ask,
     loadUrl,
     search,
     clearChat,
     toggleDark,
-    guideNext,
     reset,
     saveChat,
     history,
@@ -31,8 +30,14 @@ export default function SidePanel({ onOpenSettings }: { onOpenSettings: () => vo
     admin,
     unlockAdmin,
     lockAdmin,
+    guideRun,
+    scratchpad,
+    toggleJourney,
+    toggleReasoning,
+    closeGuideRun,
   } = useStore();
   const [input, setInput] = useState('');
+  const [openEv, setOpenEv] = useState<string | null>(null);
   const [autoOpen, setAutoOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [adminPw, setAdminPw] = useState('');
@@ -41,7 +46,7 @@ export default function SidePanel({ onOpenSettings }: { onOpenSettings: () => vo
 
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
-  }, [messages, guide]);
+  }, [messages, guideRun]);
 
   const providerLabel = PROVIDERS[settings.provider].label;
   const modelLabel = prettyModel(currentModel(settings));
@@ -55,8 +60,6 @@ export default function SidePanel({ onOpenSettings }: { onOpenSettings: () => vo
     if (/^\/clear\b/i.test(t)) return clearChat();
     void ask(t);
   };
-
-  const guideActive = guide && guide.current < guide.steps.length;
 
   return (
     <div className="relative flex h-full flex-col bg-white dark:bg-night-panel">
@@ -123,31 +126,18 @@ export default function SidePanel({ onOpenSettings }: { onOpenSettings: () => vo
         {messages.map((m) => (
           <Message key={m.id} m={m} />
         ))}
-        {guideActive && (
-          <div className="rounded-lg border border-orange-ring bg-orange-soft/60 px-3 py-2.5 text-[11px] dark:border-night-line dark:bg-[#3a2c1f]">
-            <div className="mb-1 flex items-center gap-2 font-semibold text-[#8c5a2b] dark:text-orange">
-              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-orange text-[9px] text-white">
-                {guide!.current + 1}
-              </span>
-              Step {guide!.current + 1} of {guide!.steps.length}
-            </div>
-            <p className="text-[#7a5a34] dark:text-[#e2c4a2]">{guide!.steps[guide!.current].instruction}</p>
-            <p className="mt-1 text-[10px] text-muted dark:text-night-muted">
-              {auto === 'noask'
-                ? 'PageGuide is performing this step…'
-                : 'Click the outlined control, or press “Do this step”.'}
-            </p>
-            {auto === 'ask' && (
-              <button
-                onClick={guideNext}
-                className="mt-2 rounded-md border border-sage/40 bg-sage-soft px-2.5 py-1 text-[10px] font-medium text-sage"
-              >
-                ▶ Do this step
-              </button>
-            )}
-          </div>
+        {guideRun && (
+          <GuideCard
+            run={guideRun}
+            scratchpad={scratchpad}
+            openEv={openEv}
+            setOpenEv={setOpenEv}
+            onToggleJourney={toggleJourney}
+            onToggleReasoning={toggleReasoning}
+            onClose={closeGuideRun}
+          />
         )}
-        {busy && (
+        {busy && !guideRun && (
           <div className="flex items-center gap-2 text-[11px] text-muted dark:text-night-muted">
             <span className="pg-spinner" /> Thinking…
           </div>
@@ -312,6 +302,190 @@ export default function SidePanel({ onOpenSettings }: { onOpenSettings: () => vo
       </div>
     </div>
   );
+}
+
+function GuideCard({
+  run,
+  scratchpad,
+  openEv,
+  setOpenEv,
+  onToggleJourney,
+  onToggleReasoning,
+  onClose,
+}: {
+  run: GuideRun;
+  scratchpad: Evidence[];
+  openEv: string | null;
+  setOpenEv: (n: string | null) => void;
+  onToggleJourney: () => void;
+  onToggleReasoning: () => void;
+  onClose: () => void;
+}) {
+  const dot = (s: string) =>
+    s === 'done' ? 'bg-sage' : s === 'running' ? 'bg-orange animate-pulse' : 'bg-line dark:bg-night-line';
+  const statusPill =
+    run.final?.status === 'Completed'
+      ? 'border-sage text-sage'
+      : run.final?.status === 'Failed'
+        ? 'border-[#c08457] text-[#9b6443]'
+        : 'border-line text-muted';
+  const current = run.journey.find((j) => j.status === 'running');
+
+  return (
+    <div className="space-y-2">
+      {/* task card */}
+      <div className="rounded-xl border border-line bg-white px-3 py-2.5 shadow-soft dark:border-night-line dark:bg-night-panel">
+        <div className="flex items-start justify-between gap-2">
+          <div className="text-[13px] font-semibold text-ink dark:text-night-ink">{run.task}</div>
+          <div className="flex items-center gap-2 text-muted dark:text-night-muted">
+            <button title="Download journey" onClick={() => downloadJourney(run, scratchpad)} className="hover:text-ink dark:hover:text-night-ink">
+              ⤓
+            </button>
+            <button title="Close" onClick={onClose} className="hover:text-ink dark:hover:text-night-ink">
+              ✕
+            </button>
+          </div>
+        </div>
+        <button onClick={onToggleJourney} className="mt-1 flex items-center gap-1 text-[11px] font-medium text-muted dark:text-night-muted">
+          <span className={`transition-transform ${run.journeyOpen ? 'rotate-90' : ''}`}>▸</span> View Journey
+        </button>
+        {run.journeyOpen && (
+          <div className="mt-2 space-y-2 border-t border-line pt-2 dark:border-night-line">
+            {run.journey.map((j, i) => (
+              <div key={i} className="flex items-start gap-2 text-[11px]">
+                <span className={`mt-1 h-2 w-2 flex-shrink-0 rounded-full ${dot(j.status)}`} />
+                <span className={j.status === 'pending' ? 'text-muted dark:text-night-muted' : 'text-ink dark:text-night-ink'}>
+                  {j.instruction}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+        {run.running && current && (
+          <div className="mt-2 flex items-center gap-2 border-t border-line pt-2 text-[11px] text-[#8c5a2b] dark:border-night-line dark:text-orange">
+            <span className="pg-spinner" /> {current.instruction}
+          </div>
+        )}
+      </div>
+
+      {/* answer card */}
+      {run.final && (
+        <div className="rounded-xl border border-orange-ring bg-white px-3 py-2.5 dark:border-night-line dark:bg-night-panel">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wide text-orange">Answer</span>
+            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusPill}`}>
+              {run.final.status}
+            </span>
+          </div>
+          <p className="mt-2 text-[12px] leading-relaxed text-[#5a6350] dark:text-[#c3c8ba]">
+            {renderAnswerWithEvidence(run.final.answer, scratchpad, setOpenEv)}
+          </p>
+          {run.final.reasoning && (
+            <div className="mt-2 border-t border-line pt-2 dark:border-night-line">
+              <button
+                onClick={onToggleReasoning}
+                className="flex w-full items-center justify-between text-[10px] font-bold uppercase tracking-wide text-muted dark:text-night-muted"
+              >
+                Reasoning Trail
+                <span className={`transition-transform ${run.reasoningOpen ? 'rotate-180' : ''}`}>⌄</span>
+              </button>
+              {run.reasoningOpen && (
+                <p className="mt-1.5 text-[11px] leading-relaxed text-muted dark:text-night-muted">{run.final.reasoning}</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {openEv && <EvidenceViewer ev={scratchpad.find((e) => e.name === openEv)} onClose={() => setOpenEv(null)} />}
+    </div>
+  );
+}
+
+function renderAnswerWithEvidence(answer: string, scratchpad: Evidence[], setOpenEv: (n: string | null) => void) {
+  const parts: ReactNode[] = [];
+  const re = /\[EV:([a-z0-9-]+)\]/gi;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let k = 0;
+  while ((m = re.exec(answer))) {
+    if (m.index > last) parts.push(answer.slice(last, m.index));
+    const ev = scratchpad.find((e) => e.name === m![1].toLowerCase());
+    if (ev) {
+      parts.push(
+        <button
+          key={`ev${k++}`}
+          onClick={() => setOpenEv(ev.name)}
+          title={ev.name}
+          className="mx-0.5 inline-flex items-center gap-0.5 rounded-md bg-orange-soft px-1.5 py-0.5 align-baseline text-[10px] font-semibold text-[#8c5a2b] hover:bg-orange/20"
+        >
+          📷 {ev.index}
+        </button>,
+      );
+    } else {
+      parts.push(m[0]);
+    }
+    last = re.lastIndex;
+  }
+  if (last < answer.length) parts.push(answer.slice(last));
+  return parts;
+}
+
+function EvidenceViewer({ ev, onClose }: { ev: Evidence | undefined; onClose: () => void }) {
+  if (!ev) return null;
+  const b = ev.box;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-sm rounded-2xl border border-line bg-white p-3 shadow-panel dark:border-night-line dark:bg-night-panel"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-2 flex items-center justify-between">
+          <span className="font-mono text-[11px] text-[#8c5a2b]">📷 ev:{ev.name}</span>
+          <button onClick={onClose} className="text-muted hover:text-ink dark:text-night-muted">
+            ✕
+          </button>
+        </div>
+        <div className="relative overflow-hidden rounded-lg">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={ev.imageUrl} alt={ev.name} className="block max-h-80 w-full object-contain" />
+          {b && (
+            <span
+              className="pointer-events-none absolute rounded-sm border-2 border-[#3b82f6] bg-[#3b82f6]/15"
+              style={{ left: `${b[0] * 100}%`, top: `${b[1] * 100}%`, width: `${b[2] * 100}%`, height: `${b[3] * 100}%` }}
+            />
+          )}
+        </div>
+        {ev.caption && <p className="mt-2 text-[11px] text-muted dark:text-night-muted">{ev.caption}</p>}
+      </div>
+    </div>
+  );
+}
+
+function downloadJourney(run: GuideRun, scratchpad: Evidence[]) {
+  try {
+    const lines = [
+      `Task: ${run.task}`,
+      '',
+      'Journey:',
+      ...run.journey.map((j, i) => `  ${i}. [${j.status}] ${j.instruction}`),
+      '',
+      'Evidence:',
+      ...scratchpad.map((e) => `  ev:${e.name} -> ${e.imageUrl}${e.caption ? ` (${e.caption})` : ''}`),
+      '',
+      run.final ? `Status: ${run.final.status}` : '',
+      run.final ? `Answer: ${run.final.answer}` : '',
+      run.final?.reasoning ? `Reasoning: ${run.final.reasoning}` : '',
+    ].join('\n');
+    const blob = new Blob([lines], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `pageguide-journey.txt`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } catch {
+    /* ignore */
+  }
 }
 
 function IconBtn({

@@ -44,9 +44,11 @@ Write a concise answer that cites the page with inline markers: [1], [2]… for 
 - Keep the answer under 90 words, plain text; the markers are the only square brackets.
 
 If mode is "guide":
-{"answer": "<one short sentence framing the task>", "steps": [{"id": "<control block id>", "instruction": "<what to do>", "action": "open|click|fill", "value": "<text to type, only for fill>"}]}
+You are an autonomous web agent: observe the page state and emit a plan of actions the browser will perform for the user.
+{"answer": "<one short sentence framing the task>", "steps": [{"id": "<control block id>", "instruction": "<what to do>", "action": "open|click|fill", "value": "<text to type, only for fill>", "evidence": {"name": "<short-kebab-name>", "imageId": "<a page IMAGE block id to capture>", "annotate": "<what to highlight in that image>"}}]}
 - Use at most 6 steps. Each "id" MUST be an id from the provided blocks that has "control": true.
 - "action": use "open" to follow a link, "click" to press a button, "fill" to type into an input field. For "fill", include a short realistic "value".
+- You may ALSO save evidence at any step by adding an "evidence" object: "name" is a short kebab id (e.g. orange-added-to-cart), "imageId" is the id of a page IMAGE block to use as the evidence screenshot, and optional "annotate" describes what to highlight in that image. Save evidence at key moments — especially a final confirmation step.
 - Order steps the way a user would follow them. If the page cannot support the task, return an empty steps array and explain in "answer".
 
 Keep "answer" under 100 words. Use plain text only (no markdown, no HTML).`;
@@ -258,6 +260,7 @@ export async function POST(req: NextRequest) {
 
     // guide
     const typeById = new Map(blocks.map((b) => [b.id, b.type]));
+    const imageIds = new Set(blocks.filter((b) => b.type === 'image' && b.src).map((b) => b.id));
     const rawSteps = Array.isArray(parsed?.steps) ? parsed.steps : [];
     const steps = rawSteps
       .filter(
@@ -274,7 +277,16 @@ export async function POST(req: NextRequest) {
         const inferred = t === 'link' ? 'open' : t === 'input' ? 'fill' : 'click';
         const action = ['open', 'click', 'fill'].includes(s.action) ? s.action : inferred;
         const value = action === 'fill' && typeof s.value === 'string' ? s.value.slice(0, 200) : undefined;
-        return { id: s.id, instruction: s.instruction, action, ...(value ? { value } : {}) };
+        let evidence: { name: string; imageId?: string; annotate?: string } | undefined;
+        const ev = s.evidence;
+        if (ev && typeof ev.name === 'string' && ev.name.trim()) {
+          evidence = {
+            name: ev.name.trim().replace(/[^a-z0-9-]+/gi, '-').toLowerCase().slice(0, 60),
+            ...(typeof ev.imageId === 'string' && imageIds.has(ev.imageId) ? { imageId: ev.imageId } : {}),
+            ...(typeof ev.annotate === 'string' ? { annotate: ev.annotate.slice(0, 200) } : {}),
+          };
+        }
+        return { id: s.id, instruction: s.instruction, action, ...(value ? { value } : {}), ...(evidence ? { evidence } : {}) };
       });
     return NextResponse.json({ kind: 'guide', answer, steps, usage, debug });
   } catch (err: unknown) {

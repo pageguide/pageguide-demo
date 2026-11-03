@@ -5,6 +5,7 @@ import { PROVIDERS } from './providers';
 import type {
   AskResult,
   AutoMode,
+  Evidence,
   GuideStep,
   Mode,
   PageDoc,
@@ -12,6 +13,16 @@ import type {
   SavedChat,
   SearchResult,
 } from './types';
+
+export type JourneyStatus = 'pending' | 'running' | 'done';
+export interface GuideRun {
+  task: string;
+  journey: { instruction: string; status: JourneyStatus }[];
+  journeyOpen: boolean;
+  reasoningOpen: boolean;
+  running: boolean;
+  final: { status: string; answer: string; reasoning: string } | null;
+}
 
 export type Surface = 'browser' | 'terminal';
 export type BrowserView = 'empty' | 'loading' | 'results' | 'page';
@@ -59,6 +70,8 @@ interface StoreState {
   evidence: { id: string; quote?: string; marker?: string }[]; // all cited spans of the current answer (persist)
   focusedEvidence: string | null; // the one the user clicked (shown stronger)
   guide: GuideState | null;
+  guideRun: GuideRun | null; // the autonomous Guide run (task card + journey + answer)
+  scratchpad: Evidence[]; // named evidence saved during the run
   fieldValues: Record<string, string>;
   clicked: string[];
 
@@ -79,7 +92,7 @@ interface StoreState {
   toggleDark: () => void;
   setAuto: (a: AutoMode) => void;
 
-  loadUrl: (input: string, opts?: { push?: boolean }) => Promise<void>;
+  loadUrl: (input: string, opts?: { push?: boolean; silent?: boolean }) => Promise<void>;
   goBack: () => void;
   goForward: () => void;
   search: (query: string) => Promise<void>;
@@ -90,6 +103,9 @@ interface StoreState {
   guideNext: () => void;
   setFieldValue: (id: string, v: string) => void;
   focusEvidence: (id: string) => void;
+  toggleJourney: () => void;
+  toggleReasoning: () => void;
+  closeGuideRun: () => void;
 
   saveChat: () => void;
   loadChat: (id: string) => void;
@@ -129,9 +145,11 @@ export function detectMode(q: string): Mode {
   if (t.startsWith('/guide')) return 'guide';
   if (t.startsWith('/find')) return 'find';
   if (
-    /\b(how (do|to|can) i|guide me|walk me|navigate|take me to|where (do|can) i (click|find)|steps to|sign ?up|log ?in|subscribe|check ?out|add to cart|download the|fill (in|out)|submit)\b/.test(
+    /\b(how (do|to|can) i|guide me|walk me|navigate|take me to|where (do|can) i (click|find)|steps to|sign ?up|log ?in|subscribe|check ?out|download the|fill (in|out)|submit)\b/.test(
       t,
-    )
+    ) ||
+    /\b(add|move|put).{0,30}\bto (the )?cart\b/.test(t) ||
+    /\b(add to cart|buy|purchase|place an order|order|reserve|book a|book the|complete the|go to|open the)\b/.test(t)
   )
     return 'guide';
   return 'find';
@@ -185,6 +203,8 @@ export const useStore = create<StoreState>((set, get) => ({
   evidence: [],
   focusedEvidence: null,
   guide: null,
+  guideRun: null,
+  scratchpad: [],
   fieldValues: {},
   clicked: [],
 
@@ -249,6 +269,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const url = stripCmd(input);
     if (!url) return;
     const push = opts?.push !== false;
+    const silent = opts?.silent === true;
     set({
       browserView: 'loading',
       pageError: null,
@@ -280,14 +301,16 @@ export const useStore = create<StoreState>((set, get) => ({
         browserView: 'page',
         navStack,
         navIndex,
-        messages: [
-          ...get().messages,
-          {
-            id: msgId++,
-            role: 'system',
-            text: `Loaded “${doc.title}”. Ask a question to Find an answer, or ask how to do something (or type /guide) to start a Guide.`,
-          },
-        ],
+        messages: silent
+          ? get().messages
+          : [
+              ...get().messages,
+              {
+                id: msgId++,
+                role: 'system',
+                text: `Loaded “${doc.title}”. Ask a question to Find an answer, or ask how to do something (or type /guide) to start a Guide.`,
+              },
+            ],
       });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Could not load the page.';
@@ -367,6 +390,36 @@ export const useStore = create<StoreState>((set, get) => ({
       return;
     }
 
+    // GUIDE: run the autonomous agent loop (it can navigate across pages).
+    if (mode === 'guide') {
+      set({
+        busy: true,
+        evidence: [],
+        focusedEvidence: null,
+        guide: null,
+        scratchpad: [],
+        guideRun: {
+          task: cleanQ,
+          journey: [{ instruction: 'Initial state', status: 'done' }],
+          journeyOpen: false,
+          reasoningOpen: false,
+          running: true,
+          final: null,
+        },
+      });
+      try {
+        await runAgent(get, set, cleanQ, settings);
+      } catch (e: unknown) {
+        const cur = get().guideRun;
+        const msg = e instanceof Error ? e.message : 'The agent failed.';
+        if (cur) set({ guideRun: { ...cur, running: false, final: { status: 'Failed', answer: msg, reasoning: '' } } });
+      } finally {
+        set({ busy: false });
+      }
+      return;
+    }
+
+    // FIND
     set({ busy: true, evidence: [], focusedEvidence: null, guide: null });
     try {
       const res = await fetch('/api/ask', {
@@ -395,13 +448,6 @@ export const useStore = create<StoreState>((set, get) => ({
           focusedEvidence: result.citations[0]?.id || result.visual?.id || null,
           messages: [...get().messages, { id: msgId++, role: 'assistant', text: result.answer, mode, result }],
         });
-      } else {
-        const steps = result.steps || [];
-        set({
-          guide: steps.length ? { steps, current: 0 } : null,
-          messages: [...get().messages, { id: msgId++, role: 'assistant', text: result.answer, mode, result }],
-        });
-        if (steps.length && get().auto === 'noask') scheduleAuto(get);
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'The request failed.';
@@ -515,8 +561,18 @@ export const useStore = create<StoreState>((set, get) => ({
 
   focusEvidence: (id) => set({ focusedEvidence: id }),
 
+  toggleJourney: () => {
+    const r = get().guideRun;
+    if (r) set({ guideRun: { ...r, journeyOpen: !r.journeyOpen } });
+  },
+  toggleReasoning: () => {
+    const r = get().guideRun;
+    if (r) set({ guideRun: { ...r, reasoningOpen: !r.reasoningOpen } });
+  },
+  closeGuideRun: () => set({ guideRun: null, scratchpad: [], guide: null }),
+
   clearChat: () =>
-    set({ messages: [], evidence: [], focusedEvidence: null, guide: null, fieldValues: {}, clicked: [] }),
+    set({ messages: [], evidence: [], focusedEvidence: null, guide: null, guideRun: null, scratchpad: [], fieldValues: {}, clicked: [] }),
   reset: () =>
     set({
       browserView: 'empty',
@@ -530,6 +586,8 @@ export const useStore = create<StoreState>((set, get) => ({
       evidence: [],
       focusedEvidence: null,
       guide: null,
+      guideRun: null,
+      scratchpad: [],
       fieldValues: {},
       clicked: [],
     }),
@@ -565,4 +623,157 @@ function scheduleAuto(get: () => StoreState) {
     if (s.auto !== 'noask' || !s.guide) return;
     if (s.guide.current < s.guide.steps.length) s.performStep(s.guide.current);
   }, 1700);
+}
+
+const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+function setJourney(
+  get: () => StoreState,
+  set: (p: Partial<StoreState>) => void,
+  idx: number,
+  status: JourneyStatus,
+) {
+  const r = get().guideRun;
+  if (!r) return;
+  set({ guideRun: { ...r, journey: r.journey.map((j, k) => (k === idx ? { ...j, status } : j)) } });
+}
+
+const MAX_AGENT_STEPS = 8;
+
+// Autonomous Guide agent loop: observe the current page, ask the agent for ONE action
+// (which may navigate to another page), perform it, save evidence, repeat — then summarize.
+async function runAgent(
+  get: () => StoreState,
+  set: (p: Partial<StoreState>) => void,
+  task: string,
+  settings: Settings,
+) {
+  const key = currentKey(settings);
+  const provider = settings.provider;
+  const model = currentModel(settings);
+  const history: { instruction: string; action: string }[] = [];
+
+  for (let t = 0; t < MAX_AGENT_STEPS; t++) {
+    if (!get().guideRun) return; // cancelled
+    const doc = get().doc;
+    if (!doc) break;
+
+    const res = await fetch('/api/agent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-provider-key': key },
+      body: JSON.stringify({
+        provider,
+        model,
+        task,
+        doc: { ...doc, html: undefined },
+        history,
+        evidence: get().scratchpad.map((e) => e.name),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error || 'The agent failed.');
+
+    const { instruction, action, evidence } = data as {
+      instruction: string;
+      action: { type: string; id?: string; url?: string; value?: string };
+      evidence?: { name: string; imageId?: string; annotate?: string };
+    };
+
+    // add this step to the journey (running)
+    const run0 = get().guideRun;
+    if (!run0) return;
+    const idx = run0.journey.length;
+    set({ guideRun: { ...run0, journey: [...run0.journey, { instruction, status: 'running' }] } });
+    await delay(450);
+
+    if (action.type === 'finish') {
+      if (evidence) await saveEvidence(get, set, evidence, provider, model, key);
+      setJourney(get, set, idx, 'done');
+      break;
+    }
+
+    // highlight the target control on the page
+    if (action.id) set({ guide: { steps: [{ id: action.id, instruction }], current: 0 } });
+
+    // perform the action
+    if (action.type === 'navigate') {
+      const href = action.url || doc.blocks.find((b) => b.id === action.id)?.href;
+      if (href) await get().loadUrl(href, { silent: true });
+    } else if (action.type === 'fill' && action.id) {
+      set({ fieldValues: { ...get().fieldValues, [action.id]: action.value || deriveValue('', task) } });
+    } else if (action.type === 'click' && action.id) {
+      set({ clicked: [...get().clicked, action.id] });
+    }
+
+    if (evidence) await saveEvidence(get, set, evidence, provider, model, key);
+
+    history.push({ instruction, action: `${action.type}${action.id ? ' ' + action.id : ''}${action.url ? ' ' + action.url : ''}` });
+    await delay(350);
+    setJourney(get, set, idx, 'done');
+  }
+
+  set({ guide: null });
+
+  // summarization agent writes the final answer
+  const run = get().guideRun;
+  if (!run) return;
+  try {
+    const res = await fetch('/api/summarize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-provider-key': key },
+      body: JSON.stringify({
+        provider,
+        model,
+        task,
+        journey: run.journey.map((j) => j.instruction),
+        evidence: get().scratchpad.map((e) => e.name),
+      }),
+    });
+    const data = await res.json();
+    const final = res.ok
+      ? { status: data.status, answer: data.answer, reasoning: data.reasoning }
+      : { status: 'Incomplete', answer: `The task ran, but the summary failed: ${data.error || ''}`, reasoning: '' };
+    const cur = get().guideRun;
+    if (cur) set({ guideRun: { ...cur, running: false, final } });
+  } catch {
+    const cur = get().guideRun;
+    if (cur)
+      set({ guideRun: { ...cur, running: false, final: { status: 'Incomplete', answer: 'Task finished. Summary unavailable.', reasoning: '' } } });
+  }
+}
+
+async function saveEvidence(
+  get: () => StoreState,
+  set: (p: Partial<StoreState>) => void,
+  ev: { name: string; imageId?: string; annotate?: string },
+  provider: Provider,
+  model: string,
+  key: string,
+) {
+  const doc = get().doc;
+  if (!doc) return;
+  let imageUrl = '';
+  if (ev.imageId) imageUrl = doc.blocks.find((b) => b.id === ev.imageId)?.src || '';
+  if (!imageUrl) imageUrl = doc.blocks.find((b) => b.type === 'image' && b.src)?.src || '';
+  if (!imageUrl) return; // nothing to capture
+  const index = get().scratchpad.length + 1;
+  let box: [number, number, number, number] | undefined;
+  let caption: string | undefined;
+  if (ev.annotate) {
+    try {
+      const res = await fetch('/api/annotate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-provider-key': key },
+        body: JSON.stringify({ provider, model, imageUrl, prompt: ev.annotate }),
+      });
+      if (res.ok) {
+        const d = await res.json();
+        box = d.box || undefined;
+        caption = d.caption;
+      }
+    } catch {
+      /* annotation is best-effort */
+    }
+  }
+  set({ scratchpad: [...get().scratchpad, { name: ev.name, index, imageUrl, box, caption }] });
 }
