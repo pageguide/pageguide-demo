@@ -18,7 +18,8 @@ export default function ExtensionSurface({ onOpenSettings }: { onOpenSettings: (
     results,
     pageError,
     query,
-    highlightId,
+    evidence,
+    focusedEvidence,
     guide,
     fieldValues,
     clicked,
@@ -27,6 +28,7 @@ export default function ExtensionSurface({ onOpenSettings }: { onOpenSettings: (
     openResult,
     performStep,
     setFieldValue,
+    focusEvidence,
   } = useStore();
   const [addr, setAddr] = useState('');
 
@@ -44,8 +46,10 @@ export default function ExtensionSurface({ onOpenSettings }: { onOpenSettings: (
 
   const guideTarget = guide && guide.current < guide.steps.length ? guide.steps[guide.current].id : null;
 
+  const evidenceIds = new Set(evidence.map((e) => e.id));
   const onBlockClick = (b: Block) => {
     if (guideTarget && b.id === guideTarget) return performStep();
+    if (evidenceIds.has(b.id)) return focusEvidence(b.id); // clicking a highlight focuses it
     if (b.type === 'link' && b.href) void loadUrl(b.href);
   };
 
@@ -92,7 +96,8 @@ export default function ExtensionSurface({ onOpenSettings }: { onOpenSettings: (
           {browserView === 'page' && doc && (
             <PageView
               doc={doc}
-              highlightId={highlightId}
+              evidence={evidence}
+              focusedEvidence={focusedEvidence}
               guideId={guideTarget}
               fieldValues={fieldValues}
               clicked={clicked}

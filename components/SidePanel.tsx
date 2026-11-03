@@ -506,7 +506,7 @@ function renderAnswer(
       parts.push(
         <button
           key={`c${k++}`}
-          onClick={() => useStore.setState({ highlightId: cite.id })}
+          onClick={() => useStore.getState().focusEvidence(cite.id)}
           title="Show source on the page"
           className="align-super text-[9px] font-semibold text-[#6366f1] hover:underline dark:text-[#a5a1f5]"
         >
@@ -517,7 +517,7 @@ function renderAnswer(
       parts.push(
         <button
           key={`v${k++}`}
-          onClick={() => useStore.setState({ highlightId: visual.id })}
+          onClick={() => useStore.getState().focusEvidence(visual.id)}
           title="Show the image on the page"
           className="align-super text-[9px] font-semibold text-[#b7791f] hover:underline"
         >
@@ -545,7 +545,7 @@ function VisualEvidence({
         📎 Visual evidence [{v.marker}]
       </div>
       <button
-        onClick={() => useStore.setState({ highlightId: v.id })}
+        onClick={() => useStore.getState().focusEvidence(v.id)}
         className="relative block w-full overflow-hidden rounded-md"
         title="Show this image on the page"
       >

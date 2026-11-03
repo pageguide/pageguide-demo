@@ -34,9 +34,10 @@ Return ONLY a JSON object, no prose outside it.
 If mode is "find":
 Write a concise answer that cites the page with inline markers: [1], [2]… for textual evidence, and [V1] for ONE visual exhibit when a provided IMAGE supports the answer. Put each marker right after the clause it supports.
 {"answer": "<answer text containing [1],[2],[V1] markers>",
- "citations": [{"marker": "1", "id": "<id of the text block supporting it>"}],
+ "citations": [{"marker": "1", "id": "<id of the text block supporting it>", "quote": "<exact verbatim phrase/sentence from that block that supports the answer>"}],
  "visual": {"marker": "V1", "id": "<image block id>", "box": [x, y, w, h], "caption": "<what the box shows>"} }
 - Every citation "id" MUST be a text block id (heading/paragraph/listitem/quote) from the page.
+- "quote" MUST be an exact, verbatim substring of that block's text — the specific sentence or phrase that supports the point, NOT the whole block. Copy it character-for-character.
 - Use "visual" ONLY when one of the provided IMAGE blocks supports the answer: "id" is that image's block id and "box" is the region of THAT image supporting the answer as normalized [x, y, width, height], each 0..1 from the image's top-left corner. Otherwise set "visual" to null.
 - If the user's message is a greeting, small talk, or NOT a question about this page (e.g. "hi", "hello", "thanks"), do NOT answer from the page: set "answer" to a short note inviting them to ask something about the page, and return "citations": [] and "visual": null. Never fabricate an answer or a citation.
 - If the page does not contain the answer, say so plainly and return empty "citations". Never invent facts or citations.
@@ -211,10 +212,20 @@ export async function POST(req: NextRequest) {
       );
       const imageById = new Map(blocks.filter((b) => b.type === 'image' && b.src).map((b) => [b.id, b]));
 
+      const textById = new Map(blocks.map((b) => [b.id, b.text]));
+      const norm = (s: string) => s.replace(/\s+/g, ' ').trim().toLowerCase();
       const citations = (Array.isArray(parsed?.citations) ? parsed.citations : [])
         .filter((c: any) => c && typeof c.id === 'string' && textAllow.has(c.id))
         .slice(0, 8)
-        .map((c: any) => ({ marker: String(c.marker ?? ''), id: c.id }));
+        .map((c: any) => {
+          // keep the quote only if it's genuinely a substring of the block text
+          let quote: string | undefined;
+          if (typeof c.quote === 'string' && c.quote.trim()) {
+            const blockText = textById.get(c.id) || '';
+            if (norm(blockText).includes(norm(c.quote))) quote = c.quote.trim();
+          }
+          return { marker: String(c.marker ?? ''), id: c.id, ...(quote ? { quote } : {}) };
+        });
 
       let visual: {
         marker: string;

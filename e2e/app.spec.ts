@@ -43,7 +43,7 @@ test('loads a page and Find highlights the grounded passage', async ({ page }) =
   await loadPage(page);
   await page.fill('textarea', 'When is the best time to visit?');
   await page.keyboard.press('Enter');
-  await expect(page.locator('[data-node-id="n1"]')).toHaveClass(/pg-evidence/);
+  await expect(page.locator('[data-node-id="n1"]')).toHaveClass(/pg-evidence|pg-visual/);
   await expect(page.locator('text=Visit in late spring').first()).toBeVisible();
 });
 

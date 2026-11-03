@@ -47,10 +47,12 @@ export interface Usage {
   estimated: boolean; // true = computed from a price table (OpenAI); false = provider-reported (OpenRouter)
 }
 
-// A textual citation: an inline marker ([1], [2]…) tied to a page text block.
+// A textual citation: an inline marker ([1], [2]…) tied to a page text block,
+// with the exact supporting text span (quote) within that block.
 export interface TextCitation {
   marker: string;
   id: string;
+  quote?: string;
 }
 
 // Visual evidence: an image block plus a normalized bounding box [x, y, w, h]

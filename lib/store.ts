@@ -54,7 +54,8 @@ interface StoreState {
 
   messages: ChatMessage[];
   busy: boolean;
-  highlightId: string | null;
+  evidence: { id: string; quote?: string }[]; // all cited spans of the current answer (persist)
+  focusedEvidence: string | null; // the one the user clicked (shown stronger)
   guide: GuideState | null;
   fieldValues: Record<string, string>;
   clicked: string[];
@@ -84,6 +85,7 @@ interface StoreState {
   performStep: (index?: number) => void;
   guideNext: () => void;
   setFieldValue: (id: string, v: string) => void;
+  focusEvidence: (id: string) => void;
 
   saveChat: () => void;
   loadChat: (id: string) => void;
@@ -174,7 +176,8 @@ export const useStore = create<StoreState>((set, get) => ({
 
   messages: [],
   busy: false,
-  highlightId: null,
+  evidence: [],
+  focusedEvidence: null,
   guide: null,
   fieldValues: {},
   clicked: [],
@@ -243,7 +246,8 @@ export const useStore = create<StoreState>((set, get) => ({
       browserView: 'loading',
       pageError: null,
       results: null,
-      highlightId: null,
+      evidence: [],
+      focusedEvidence: null,
       guide: null,
       fieldValues: {},
       clicked: [],
@@ -333,7 +337,7 @@ export const useStore = create<StoreState>((set, get) => ({
       return;
     }
 
-    set({ busy: true, highlightId: null, guide: null });
+    set({ busy: true, evidence: [], focusedEvidence: null, guide: null });
     try {
       const res = await fetch('/api/ask', {
         method: 'POST',
@@ -351,17 +355,20 @@ export const useStore = create<StoreState>((set, get) => ({
       const result = data as AskResult;
 
       if (result.kind === 'find') {
-        // Scroll the page to the first cited passage (or the visual exhibit).
-        const first = result.citations[0]?.id || result.visual?.id || null;
+        // Highlight ALL cited passages (persist); focus/scroll to the first.
+        const evidence = [
+          ...result.citations.map((c) => ({ id: c.id, quote: c.quote })),
+          ...(result.visual ? [{ id: result.visual.id }] : []),
+        ];
         set({
-          highlightId: first,
+          evidence,
+          focusedEvidence: result.citations[0]?.id || result.visual?.id || null,
           messages: [...get().messages, { id: msgId++, role: 'assistant', text: result.answer, mode, result }],
         });
       } else {
         const steps = result.steps || [];
         set({
           guide: steps.length ? { steps, current: 0 } : null,
-          highlightId: steps.length ? steps[0].id : null,
           messages: [...get().messages, { id: msgId++, role: 'assistant', text: result.answer, mode, result }],
         });
         if (steps.length && get().auto === 'noask') scheduleAuto(get);
@@ -454,7 +461,8 @@ export const useStore = create<StoreState>((set, get) => ({
       doc: chat.doc,
       browserView: chat.doc ? 'page' : 'empty',
       messages: (chat.messages as ChatMessage[]) || [],
-      highlightId: null,
+      evidence: [],
+      focusedEvidence: null,
       guide: null,
       fieldValues: {},
       clicked: [],
@@ -473,7 +481,10 @@ export const useStore = create<StoreState>((set, get) => ({
 
   toggleHistory: (open) => set({ historyOpen: open ?? !get().historyOpen }),
 
-  clearChat: () => set({ messages: [], highlightId: null, guide: null, fieldValues: {}, clicked: [] }),
+  focusEvidence: (id) => set({ focusedEvidence: id }),
+
+  clearChat: () =>
+    set({ messages: [], evidence: [], focusedEvidence: null, guide: null, fieldValues: {}, clicked: [] }),
   reset: () =>
     set({
       browserView: 'empty',
@@ -482,7 +493,8 @@ export const useStore = create<StoreState>((set, get) => ({
       pageError: null,
       query: '',
       messages: [],
-      highlightId: null,
+      evidence: [],
+      focusedEvidence: null,
       guide: null,
       fieldValues: {},
       clicked: [],
@@ -501,7 +513,6 @@ function goStep(get: () => StoreState, set: (p: Partial<StoreState>) => void, ne
   if (next >= g.steps.length) {
     set({
       guide: { ...g, current: next },
-      highlightId: null,
       messages: [
         ...get().messages,
         { id: msgId++, role: 'assistant', text: '✓ Walkthrough complete. PageGuide performed each step on the page.' },
@@ -509,7 +520,7 @@ function goStep(get: () => StoreState, set: (p: Partial<StoreState>) => void, ne
     });
     return;
   }
-  set({ guide: { ...g, current: next }, highlightId: g.steps[next].id });
+  set({ guide: { ...g, current: next } });
   if (get().auto === 'noask') scheduleAuto(get);
 }
 
