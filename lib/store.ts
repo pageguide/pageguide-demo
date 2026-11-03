@@ -2,10 +2,15 @@
 
 import { create } from 'zustand';
 import { PROVIDERS } from './providers';
+import { LOCAL_LIBRARY, snapshotId, parseLibrary, type Library } from './library';
+import { sandboxSite, sandboxDoc, initialSandbox, routeSandbox, applySandboxAction, verifySandboxTask, type SandboxSite, type SandboxState, type BrowserAction } from './sandboxes';
+import { cachedPage, cachePage } from './page-cache';
+import type { VerificationResult } from './verification';
 import type {
   AskResult,
   AutoMode,
   Evidence,
+  EvidenceRequest,
   GuideStep,
   Mode,
   PageDoc,
@@ -14,14 +19,15 @@ import type {
   SearchResult,
 } from './types';
 
-export type JourneyStatus = 'pending' | 'running' | 'done';
+export type JourneyStatus = 'pending' | 'running' | 'done' | 'failed';
 export interface GuideRun {
+  id: number;
   task: string;
-  journey: { instruction: string; status: JourneyStatus }[];
+  journey: { instruction: string; status: JourneyStatus; screenshot?: string; capturedAt?: string; screenshotError?: string; evidenceName?: string }[];
   journeyOpen: boolean;
   reasoningOpen: boolean;
   running: boolean;
-  final: { status: string; answer: string; reasoning: string } | null;
+  final: { status: string; answer: string; reasoning: string; verification?: VerificationResult } | null;
 }
 
 export type Surface = 'browser' | 'terminal';
@@ -59,6 +65,8 @@ interface StoreState {
 
   browserView: BrowserView;
   doc: PageDoc | null;
+  library: Library;
+  sandboxSessions: Partial<Record<SandboxSite, SandboxState>>;
   pageError: string | null;
   results: SearchResult[] | null;
   query: string;
@@ -92,7 +100,11 @@ interface StoreState {
   toggleDark: () => void;
   setAuto: (a: AutoMode) => void;
 
-  loadUrl: (input: string, opts?: { push?: boolean; silent?: boolean }) => Promise<void>;
+  loadUrl: (input: string, opts?: { push?: boolean; silent?: boolean; refresh?: boolean }) => Promise<void>;
+  loadLibrary: () => Promise<void>;
+  actOnSandbox: (action: BrowserAction) => string;
+  resetSandbox: () => void;
+  showLibrary: () => void;
   goBack: () => void;
   goForward: () => void;
   search: (query: string) => Promise<void>;
@@ -121,6 +133,10 @@ interface StoreState {
 const LS_SETTINGS = 'pageguide.settings.v2';
 const LS_HISTORY = 'pageguide.history.v1';
 let msgId = 1;
+let runId = 0;
+let navigationId = 0;
+let navigationAbort: AbortController | null = null;
+let agentAbort: AbortController | null = null;
 
 function defaultSettings(): Settings {
   return {
@@ -149,6 +165,8 @@ export function detectMode(q: string): Mode {
       t,
     ) ||
     /\b(add|move|put).{0,30}\bto (the )?cart\b/.test(t) ||
+    /\b(change|switch|set).{0,35}\blanguage\b/.test(t) ||
+    /\b(browse|read).{0,25}\bposts?\b/.test(t) ||
     /\b(add to cart|buy|purchase|place an order|order|reserve|book a|book the|complete the|go to|open the)\b/.test(t)
   )
     return 'guide';
@@ -192,6 +210,8 @@ export const useStore = create<StoreState>((set, get) => ({
 
   browserView: 'empty',
   doc: null,
+  library: LOCAL_LIBRARY,
+  sandboxSessions: {},
   pageError: null,
   results: null,
   query: '',
@@ -249,7 +269,9 @@ export const useStore = create<StoreState>((set, get) => ({
     } catch {
       /* ignore */
     }
+    try { localStorage.removeItem('pageguide.custom-sites.v1'); } catch { /* ignore */ }
     set({ settings, history, hydrated: true });
+    void get().loadLibrary();
     if (typeof document !== 'undefined') document.documentElement.classList.toggle('dark', settings.dark);
   },
 
@@ -265,57 +287,102 @@ export const useStore = create<StoreState>((set, get) => ({
   toggleDark: () => get().patchSettings({ dark: !get().settings.dark }),
   setAuto: (a) => set({ auto: a }),
 
+  loadLibrary: async () => {
+    try {
+      const res = await fetch('/api/library');
+      const data = res.ok ? await res.json() : null;
+      const library = parseLibrary(data?.library);
+      // Never swap the seed under an active page/run.
+      if (library && get().browserView === 'empty' && !get().guideRun) set({ library });
+    } catch { /* bundled library is already available */ }
+  },
+
+  showLibrary: () => {
+    navigationAbort?.abort();
+    navigationId++;
+    agentAbort?.abort();
+    set({ browserView: 'empty', doc: null, results: null, pageError: null, busy: false, guideRun: null, guide: null, evidence: [], focusedEvidence: null });
+  },
+
+  resetSandbox: () => {
+    const site = get().doc?.sandbox;
+    if (!site) return;
+    agentAbort?.abort();
+    const state = initialSandbox(site);
+    set({ sandboxSessions: { ...get().sandboxSessions, [site]: state }, doc: sandboxDoc(state, get().library), guide: null, guideRun: null, scratchpad: [], evidence: [], focusedEvidence: null, busy: false });
+  },
+
+  actOnSandbox: (action) => {
+    const site = get().doc?.sandbox;
+    if (!site) throw new Error('Open a sandbox before performing interactive actions.');
+    const state = get().sandboxSessions[site];
+    if (!state) throw new Error('Sandbox state is unavailable.');
+    const result = applySandboxAction(state, action, get().library);
+    const doc = sandboxDoc(result.state, get().library);
+    let { navStack, navIndex } = get();
+    // Typing updates state, not navigation history.
+    if (action.type !== 'fill' && doc.url !== get().doc!.url) {
+      navStack = navStack.slice(0, navIndex + 1).concat(doc.url);
+      navIndex = navStack.length - 1;
+    } else if (navIndex >= 0) {
+      navStack = navStack.map((url, i) => i === navIndex ? doc.url : url);
+    }
+    set({ sandboxSessions: { ...get().sandboxSessions, [site]: result.state }, doc, query: doc.url, navStack, navIndex, evidence: [], focusedEvidence: null });
+    return result.observation;
+  },
+
   loadUrl: async (input, opts) => {
-    const url = stripCmd(input);
+    let url = stripCmd(input);
     if (!url) return;
+    if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+    const id = ++navigationId;
+    navigationAbort?.abort();
+    const controller = new AbortController();
+    navigationAbort = controller;
+    if (!opts?.silent) { agentAbort?.abort(); set({ guideRun: null, busy: false }); }
     const push = opts?.push !== false;
     const silent = opts?.silent === true;
-    set({
-      browserView: 'loading',
-      pageError: null,
-      results: null,
-      evidence: [],
-      focusedEvidence: null,
-      guide: null,
-      fieldValues: {},
-      clicked: [],
-      query: url,
-    });
+    set({ pageError: null, results: null, evidence: [], focusedEvidence: null, guide: null, fieldValues: {}, clicked: [], query: url });
+    const timer = setTimeout(() => controller.abort(), 10000);
     try {
-      const res = await fetch('/api/fetch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Could not load the page.');
-      const doc = data as PageDoc;
-      // navigation history
-      let { navStack, navIndex } = get();
-      if (push) {
-        navStack = navStack.slice(0, navIndex + 1).concat(doc.url);
-        navIndex = navStack.length - 1;
+      new URL(url); // validate before any request
+      const site = sandboxSite(url);
+      let doc: PageDoc | null = null;
+      if (site) {
+        const state = routeSandbox(get().sandboxSessions[site] || initialSandbox(site), url, get().library);
+        set({ sandboxSessions: { ...get().sandboxSessions, [site]: state } });
+        doc = sandboxDoc(state, get().library);
+      } else {
+        doc = !opts?.refresh ? cachedPage(url) : null;
+        const saved = snapshotId(url, get().library);
+        if (!doc && saved && !opts?.refresh) {
+          set({ browserView: 'loading' });
+          const response = await fetch(`/api/saved/${saved}`, { signal: controller.signal });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data?.error || 'The saved website could not be opened.');
+          doc = data as PageDoc;
+          cachePage(url, doc);
+        }
       }
-      set({
-        doc,
-        browserView: 'page',
-        navStack,
-        navIndex,
-        messages: silent
-          ? get().messages
-          : [
-              ...get().messages,
-              {
-                id: msgId++,
-                role: 'system',
-                text: `Loaded “${doc.title}”. Ask a question to Find an answer, or ask how to do something (or type /guide) to start a Guide.`,
-              },
-            ],
-      });
+      if (!doc) {
+        if (new URL(url).hostname.endsWith('.pageguide.test')) throw new Error('That saved page does not exist. Choose a page from the library.');
+        set({ browserView: 'loading' });
+        const res = await fetch('/api/fetch', { method: 'POST', signal: controller.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, refresh: opts?.refresh }) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || 'Could not load the page.');
+        doc = data as PageDoc;
+        cachePage(url, doc);
+        cachePage(doc.url, doc);
+      }
+      if (id !== navigationId) return;
+      let { navStack, navIndex } = get();
+      if (push) { navStack = navStack.slice(0, navIndex + 1).concat(doc.url); navIndex = navStack.length - 1; }
+      set({ doc, browserView: 'page', navStack, navIndex, messages: silent ? get().messages : [...get().messages, { id: msgId++, role: 'system', text: `Loaded “${doc.title}”. ${doc.sandbox ? 'Click any control or ask Guide to perform a task.' : 'Ask a question to Find an answer with sources.'}` }] });
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Could not load the page.';
+      if (id !== navigationId) return;
+      const msg = controller.signal.aborted ? 'Loading timed out. Try an instant saved page below, or retry your URL.' : e instanceof Error ? e.message : 'Could not load the page.';
       set({ browserView: 'empty', doc: null, pageError: msg });
-    }
+    } finally { clearTimeout(timer); }
   },
 
   goBack: () => {
@@ -392,6 +459,9 @@ export const useStore = create<StoreState>((set, get) => ({
 
     // GUIDE: run the autonomous agent loop (it can navigate across pages).
     if (mode === 'guide') {
+      const id = ++runId;
+      agentAbort?.abort();
+      agentAbort = new AbortController();
       set({
         busy: true,
         evidence: [],
@@ -399,9 +469,10 @@ export const useStore = create<StoreState>((set, get) => ({
         guide: null,
         scratchpad: [],
         guideRun: {
+          id,
           task: cleanQ,
           journey: [{ instruction: 'Initial state', status: 'done' }],
-          journeyOpen: false,
+          journeyOpen: true,
           reasoningOpen: false,
           running: true,
           final: null,
@@ -412,9 +483,9 @@ export const useStore = create<StoreState>((set, get) => ({
       } catch (e: unknown) {
         const cur = get().guideRun;
         const msg = e instanceof Error ? e.message : 'The agent failed.';
-        if (cur) set({ guideRun: { ...cur, running: false, final: { status: 'Failed', answer: msg, reasoning: '' } } });
+        if (cur?.id === id) set({ guideRun: { ...cur, running: false, final: { status: 'Failed', answer: msg, reasoning: '' } } });
       } finally {
-        set({ busy: false });
+        if (get().guideRun?.id === id) set({ busy: false });
       }
       return;
     }
@@ -569,12 +640,18 @@ export const useStore = create<StoreState>((set, get) => ({
     const r = get().guideRun;
     if (r) set({ guideRun: { ...r, reasoningOpen: !r.reasoningOpen } });
   },
-  closeGuideRun: () => set({ guideRun: null, scratchpad: [], guide: null }),
+  closeGuideRun: () => { agentAbort?.abort(); set({ guideRun: null, scratchpad: [], guide: null, busy: false }); },
 
-  clearChat: () =>
-    set({ messages: [], evidence: [], focusedEvidence: null, guide: null, guideRun: null, scratchpad: [], fieldValues: {}, clicked: [] }),
-  reset: () =>
+  clearChat: () => {
+    agentAbort?.abort();
+    set({ messages: [], evidence: [], focusedEvidence: null, guide: null, guideRun: null, scratchpad: [], fieldValues: {}, clicked: [], busy: false });
+  },
+  reset: () => {
+    navigationAbort?.abort();
+    navigationId++;
+    agentAbort?.abort();
     set({
+      busy: false,
       browserView: 'empty',
       doc: null,
       results: null,
@@ -590,7 +667,8 @@ export const useStore = create<StoreState>((set, get) => ({
       scratchpad: [],
       fieldValues: {},
       clicked: [],
-    }),
+    });
+  },
 }));
 
 function lastUserQuestion(get: () => StoreState): string {
@@ -638,7 +716,7 @@ function setJourney(
   set({ guideRun: { ...r, journey: r.journey.map((j, k) => (k === idx ? { ...j, status } : j)) } });
 }
 
-const MAX_AGENT_STEPS = 8;
+const MAX_AGENT_STEPS = 16;
 
 // Autonomous Guide agent loop: observe the current page, ask the agent for ONE action
 // (which may navigate to another page), perform it, save evidence, repeat — then summarize.
@@ -648,132 +726,169 @@ async function runAgent(
   task: string,
   settings: Settings,
 ) {
-  const key = currentKey(settings);
-  const provider = settings.provider;
-  const model = currentModel(settings);
-  const history: { instruction: string; action: string }[] = [];
-
-  for (let t = 0; t < MAX_AGENT_STEPS; t++) {
-    if (!get().guideRun) return; // cancelled
-    const doc = get().doc;
-    if (!doc) break;
-
-    const res = await fetch('/api/agent', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-provider-key': key },
-      body: JSON.stringify({
-        provider,
-        model,
-        task,
-        doc: { ...doc, html: undefined },
-        history,
-        evidence: get().scratchpad.map((e) => e.name),
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data?.error || 'The agent failed.');
-
-    const { instruction, action, evidence } = data as {
-      instruction: string;
-      action: { type: string; id?: string; url?: string; value?: string };
-      evidence?: { name: string; imageId?: string; annotate?: string };
-    };
-
-    // add this step to the journey (running)
-    const run0 = get().guideRun;
-    if (!run0) return;
-    const idx = run0.journey.length;
-    set({ guideRun: { ...run0, journey: [...run0.journey, { instruction, status: 'running' }] } });
-    await delay(450);
-
-    if (action.type === 'finish') {
-      if (evidence) await saveEvidence(get, set, evidence, provider, model, key);
-      setJourney(get, set, idx, 'done');
-      break;
-    }
-
-    // highlight the target control on the page
-    if (action.id) set({ guide: { steps: [{ id: action.id, instruction }], current: 0 } });
-
-    // perform the action
-    if (action.type === 'navigate') {
-      const href = action.url || doc.blocks.find((b) => b.id === action.id)?.href;
-      if (href) await get().loadUrl(href, { silent: true });
-    } else if (action.type === 'fill' && action.id) {
-      set({ fieldValues: { ...get().fieldValues, [action.id]: action.value || deriveValue('', task) } });
-    } else if (action.type === 'click' && action.id) {
-      set({ clicked: [...get().clicked, action.id] });
-    }
-
-    if (evidence) await saveEvidence(get, set, evidence, provider, model, key);
-
-    history.push({ instruction, action: `${action.type}${action.id ? ' ' + action.id : ''}${action.url ? ' ' + action.url : ''}` });
-    await delay(350);
-    setJourney(get, set, idx, 'done');
-  }
-
-  set({ guide: null });
-
-  // summarization agent writes the final answer
-  const run = get().guideRun;
-  if (!run) return;
+  const id = get().guideRun!.id;
+  const signal = agentAbort!.signal;
+  const alive = () => get().guideRun?.id === id && !signal.aborted;
+  const site = get().doc?.sandbox;
+  const initialState = site ? get().sandboxSessions[site] : undefined;
+  const history: { instruction: string; action: string; observation: string }[] = [];
+  let finished = false;
+  let failure = '';
+  await captureStep(get, set, 0, undefined, alive);
   try {
-    const res = await fetch('/api/summarize', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-provider-key': key },
-      body: JSON.stringify({
-        provider,
-        model,
-        task,
-        journey: run.journey.map((j) => j.instruction),
-        evidence: get().scratchpad.map((e) => e.name),
-      }),
-    });
-    const data = await res.json();
-    const final = res.ok
-      ? { status: data.status, answer: data.answer, reasoning: data.reasoning }
-      : { status: 'Incomplete', answer: `The task ran, but the summary failed: ${data.error || ''}`, reasoning: '' };
-    const cur = get().guideRun;
-    if (cur) set({ guideRun: { ...cur, running: false, final } });
-  } catch {
-    const cur = get().guideRun;
-    if (cur)
-      set({ guideRun: { ...cur, running: false, final: { status: 'Incomplete', answer: 'Task finished. Summary unavailable.', reasoning: '' } } });
+    for (let t = 0; t < MAX_AGENT_STEPS; t++) {
+      if (!alive()) return;
+      const doc = get().doc;
+      if (!doc) throw new Error('The page is no longer available.');
+      const res = await fetch('/api/agent', {
+        method: 'POST', signal,
+        headers: { 'Content-Type': 'application/json', 'x-provider-key': currentKey(settings) },
+        body: JSON.stringify({ provider: settings.provider, model: currentModel(settings), task, doc: { ...doc, html: undefined }, history, evidence: get().scratchpad.map((e) => e.name) }),
+      });
+      const data = await res.json();
+      if (!alive()) return;
+      if (!res.ok) throw new Error(data?.error || 'The agent failed.');
+      const { instruction, action, evidence } = data as { instruction: string; action: BrowserAction; evidence?: EvidenceRequest };
+      if (!action || !['navigate', 'click', 'fill', 'finish'].includes(action.type)) throw new Error('The agent returned an invalid action.');
+      const run = get().guideRun!;
+      const idx = run.journey.length;
+      set({ guideRun: { ...run, journey: [...run.journey, { instruction, status: 'running' }] } });
+      if (action.id) set({ guide: { steps: [{ id: action.id, instruction }], current: 0 } });
+      await delay(120);
+      if (!alive()) return;
+      if (action.type === 'finish') {
+        finished = true;
+        set({ guide: null });
+        await captureStep(get, set, idx, evidence, alive);
+        if (!alive()) return;
+        setJourney(get, set, idx, 'done');
+        break;
+      }
+      let observation = '';
+      const target = doc.blocks.find((b) => b.id === action.id && b.control);
+      if (action.type === 'navigate' || (action.type === 'click' && target?.type === 'link')) {
+        const href = action.url || target?.href;
+        if (!href || (site && sandboxSite(href) !== site)) throw new Error('Guide cannot leave this isolated sandbox.');
+        await get().loadUrl(href, { silent: true });
+        if (!alive()) return;
+        if (!get().doc) throw new Error(get().pageError || 'Navigation failed.');
+        observation = get().doc!.blocks.map((b) => b.text).join('\n');
+      } else if (site) {
+        observation = get().actOnSandbox(action);
+      } else {
+        throw new Error('This external page is a read-only snapshot. Open an interactive Guide sandbox to click buttons or submit forms.');
+      }
+      history.push({ instruction, action: `${action.type} ${action.id || action.url || ''}`, observation: observation.slice(0, 5000) });
+      set({ guide: null });
+      await captureStep(get, set, idx, evidence, alive);
+      if (!alive()) return;
+      setJourney(get, set, idx, 'done');
+    }
+  } catch (e) {
+    if (!alive()) return;
+    failure = e instanceof Error ? e.message : 'The action failed.';
+    const idx = get().guideRun!.journey.length - 1;
+    setJourney(get, set, idx, 'failed');
+    await captureStep(get, set, idx, undefined, alive);
   }
+  if (!alive()) return;
+  set({ guide: null });
+  const state = site ? get().sandboxSessions[site] : null;
+  const known = state ? verifySandboxTask(task, state, get().library, initialState) : null;
+  let verified: VerificationResult = { completed: false, reason: 'No completion check ran.', answer: '', source: 'unavailable' };
+  if (failure || !finished) {
+    const reason = failure || 'The step limit was reached before the agent finished the task.';
+    verified = { completed: false, reason, answer: reason, source: 'unavailable' };
+  } else if (known?.supported) {
+    verified = { ...known, source: 'sandbox-state' };
+  } else {
+    try {
+      const res = await fetch('/api/verify', {
+        method: 'POST', signal,
+        headers: { 'Content-Type': 'application/json', 'x-provider-key': currentKey(settings) },
+        body: JSON.stringify({ provider: settings.provider, model: currentModel(settings), task, doc: { ...get().doc, html: undefined }, history }),
+      });
+      const result = await res.json();
+      if (!alive()) return;
+      if (!res.ok) throw new Error(result?.error || 'Page verification was unavailable.');
+      if (typeof result.completed !== 'boolean' || typeof result.reason !== 'string' || typeof result.answer !== 'string') throw new Error('The completion check returned an invalid response.');
+      verified = { completed: result.completed, reason: result.reason, answer: result.answer, source: 'page-evidence' };
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'Page verification was unavailable.';
+      verified = { completed: false, reason, answer: `The task could not be verified: ${reason}`, source: 'unavailable' };
+    }
+  }
+  if (!alive()) return;
+  const completed = !failure && finished && verified.completed;
+  const answer = verified.answer;
+  const status = failure ? 'Failed' : completed ? 'Completed' : 'Incomplete';
+  const selected = get().scratchpad;
+  const references = selected.map((e) => `[EV:${e.name}]`).join(' ');
+  let finalAnswer = `${answer}${references ? ` ${references}` : ' No screenshot evidence was selected; see Journey for action snapshots.'}`;
+  // The model writes the answer from actual outcomes and explicitly selected evidence.
+  // The verified runtime status cannot be upgraded by the summarizer.
+  if (!failure) {
+    try {
+      const res = await fetch('/api/summarize', {
+        method: 'POST', signal,
+        headers: { 'Content-Type': 'application/json', 'x-provider-key': currentKey(settings) },
+        body: JSON.stringify({ provider: settings.provider, model: currentModel(settings), task, status,
+          outcome: answer, journey: history.map((h) => `${h.instruction}\nObserved: ${h.observation}`),
+          evidence: selected.map((e) => ({ name: e.name, description: e.caption, observation: e.observation })),
+        }),
+      });
+      const result = await res.json();
+      if (!alive()) return;
+      if (res.ok && typeof result.answer === 'string' && result.answer.trim()) {
+        finalAnswer = result.answer.replace(/\[EV:([^\]]+)\]/g, (ref: string, name: string) => selected.some((e) => e.name === name) ? ref : '');
+        if (!/\[EV:/.test(finalAnswer) && references) finalAnswer += ` ${references}`;
+      }
+    } catch { /* Keep the truthful, source-linked runtime fallback. */ }
+  }
+  if (!alive()) return;
+  const run = get().guideRun!;
+  set({ guideRun: { ...run, running: false, final: { status, answer: finalAnswer, reasoning: '', verification: verified } } });
 }
 
-async function saveEvidence(
+async function captureStep(
   get: () => StoreState,
   set: (p: Partial<StoreState>) => void,
-  ev: { name: string; imageId?: string; annotate?: string },
-  provider: Provider,
-  model: string,
-  key: string,
-) {
+  step: number,
+  ev: EvidenceRequest | undefined,
+  alive: () => boolean,
+): Promise<void> {
   const doc = get().doc;
-  if (!doc) return;
-  let imageUrl = '';
-  if (ev.imageId) imageUrl = doc.blocks.find((b) => b.id === ev.imageId)?.src || '';
-  if (!imageUrl) imageUrl = doc.blocks.find((b) => b.type === 'image' && b.src)?.src || '';
-  if (!imageUrl) return; // nothing to capture
+  if (!doc || !alive()) return;
+  const previousEvidence = get().evidence;
   const index = get().scratchpad.length + 1;
-  let box: [number, number, number, number] | undefined;
-  let caption: string | undefined;
-  if (ev.annotate) {
-    try {
-      const res = await fetch('/api/annotate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-provider-key': key },
-        body: JSON.stringify({ provider, model, imageUrl, prompt: ev.annotate }),
-      });
-      if (res.ok) {
-        const d = await res.json();
-        box = d.box || undefined;
-        caption = d.caption;
-      }
-    } catch {
-      /* annotation is best-effort */
+  const requestedTarget = ev?.targetId && doc.blocks.some((b) => b.id === ev.targetId) ? ev.targetId : null;
+  const proofIds = requestedTarget ? [requestedTarget] : ['current-state', 'notice', 'subtotal', 'language-current', 'order-confirmation'].filter((id) => doc.blocks.some((b) => b.id === id));
+  if (ev && proofIds.length) set({ evidence: proofIds.map((id) => ({ id, marker: String(index) })), focusedEvidence: null });
+  try {
+    const { capturePage, screenshotBox } = await import('./capture-page');
+    const imageUrl = await capturePage();
+    if (!alive()) return;
+    const capturedAt = new Date().toISOString();
+    const run = get().guideRun!;
+    const instruction = run.journey[step].instruction;
+    // Every step has a snapshot. Only an explicit agent request creates named evidence.
+    let evidence: Evidence | undefined;
+    if (ev?.name) {
+      const slug = ev.name.toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 50);
+      evidence = {
+        name: `${slug}-${index}`, label: ev.name.replace(/-/g, ' '), index, step, imageUrl,
+        url: doc.url, capturedAt, caption: ev.description || ev.name.replace(/-/g, ' '),
+        annotation: ev.annotate,
+        box: ev.annotate && requestedTarget ? screenshotBox(requestedTarget) : undefined,
+        observation: doc.blocks.filter((b) => !b.control).map((b) => b.text).join('\n'),
+      };
     }
+    set({ guideRun: { ...run, journey: run.journey.map((j, i) => i === step ? { ...j, screenshot: imageUrl, capturedAt, evidenceName: evidence?.name } : j) },
+      ...(evidence ? { scratchpad: [...get().scratchpad, evidence] } : {}),
+    });
+  } catch {
+    if (!alive()) return;
+    const run = get().guideRun!;
+    set({ evidence: previousEvidence, guideRun: { ...run, journey: run.journey.map((j, i) => i === step ? { ...j, screenshotError: 'Screenshot unavailable for this step.' } : j) } });
   }
-  set({ scratchpad: [...get().scratchpad, { name: ev.name, index, imageUrl, box, caption }] });
 }

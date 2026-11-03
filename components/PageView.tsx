@@ -6,12 +6,13 @@ import type { Block, PageDoc } from '@/lib/types';
 type Evidence = { id: string; quote?: string; marker?: string };
 
 const HILITE_CSS = `
-[data-pg-ev], mark[data-pg-ev]{background:#fff2b8 !important;color:#5b531f !important;box-shadow:0 0 0 2px #e9cf86;border-radius:3px}
-[data-pg-focus], mark[data-pg-focus]{background:#ffcf7a !important;color:#4a3b16 !important;box-shadow:0 0 0 3px #f0792b !important;border-radius:4px}
+[data-pg-ev], mark[data-pg-ev]{background:#fff5ed !important;color:#553b2c !important;box-shadow:0 0 0 1px #edc7ab;border-radius:5px}
+[data-pg-focus], mark[data-pg-focus]{background:#ffe6d5 !important;color:#513524 !important;box-shadow:0 0 0 1.5px #dc986a !important;border-radius:5px}
+[data-pg-ev] a,[data-pg-focus] a,a[data-pg-ev],a[data-pg-focus]{color:#9c4f25 !important;text-decoration-color:#d6a07d !important}
 [data-pg-gd]{box-shadow:0 0 0 3px #f0792b !important;background:#fff6ee !important;border-radius:6px;scroll-margin:100px}
 mark[data-pg-ev],mark[data-pg-focus]{padding:0 1px}
-sup[data-pg-badge]{background:#f0792b;color:#fff;border-radius:5px;padding:0 4px;font-size:9px;font-weight:700;margin:0 2px;vertical-align:super;cursor:pointer;line-height:1.4;font-family:ui-sans-serif,system-ui,sans-serif;text-decoration:none}
-sup[data-pg-badge][data-focused]{box-shadow:0 0 0 2px #7a3e12}
+sup[data-pg-badge]{background:#a85024;color:#fff;border-radius:5px;padding:0 4px;font-size:9px;font-weight:700;margin:0 2px;vertical-align:super;cursor:pointer;line-height:1.4;font-family:ui-sans-serif,system-ui,sans-serif;text-decoration:none}
+sup[data-pg-badge][data-focused]{box-shadow:0 0 0 2px #f3ceb4}
 html{scroll-behavior:smooth}
 `;
 
@@ -71,6 +72,7 @@ export default function PageView({
   fieldValues,
   onBlockClick,
   onNavigate,
+  onFieldChange,
 }: {
   doc: PageDoc;
   evidence: Evidence[];
@@ -98,23 +100,35 @@ export default function PageView({
         const t = e.target as HTMLElement;
         const tagged = t?.closest?.('[data-pg-id]') as HTMLElement | null;
         const anchor = t?.closest?.('a[href]') as HTMLAnchorElement | null;
+        if (anchor && !t.closest('[data-pg-badge]')) {
+          e.preventDefault();
+          const href = new URL(anchor.getAttribute('href') || '', doc.url);
+          const current = new URL(doc.url);
+          if (href.hash && href.origin === current.origin && href.pathname === current.pathname) {
+            try { d.getElementById(decodeURIComponent(href.hash.slice(1)))?.scrollIntoView({ block: 'start' }); } catch { /* invalid fragment */ }
+          } else if (/^https?:$/.test(href.protocol)) onNavigate(href.href);
+          return;
+        }
         if (tagged) {
           const b = doc.blocks.find((x) => x.id === tagged.getAttribute('data-pg-id'));
           if (b) {
-            e.preventDefault();
+            if (b.type === 'link') e.preventDefault();
             onBlockClick(b);
             return;
           }
         }
-        if (anchor) {
-          e.preventDefault();
-          if (anchor.href) onNavigate(anchor.href);
-        }
       },
       true,
     );
+    d.addEventListener('input', (e) => {
+      const el = e.target as HTMLInputElement;
+      const id = el.getAttribute('data-pg-id');
+      if (id) onFieldChange(id, el.value);
+    });
+    // Remote snapshots cannot submit real forms; sandbox pages provide safe working forms.
+    d.addEventListener('submit', (e) => e.preventDefault());
     setReady(true);
-  }, [doc, onBlockClick, onNavigate]);
+  }, [doc, onBlockClick, onNavigate, onFieldChange]);
 
   // Apply all evidence highlights (persist), focus the clicked one, plus guide target.
   useEffect(() => {
@@ -221,9 +235,13 @@ function ReaderFallback({
               key={b.id}
               data-node-id={b.id}
               onClick={() => onBlockClick(b)}
-              className={`my-1 text-[13px] leading-7 text-[#555b50] dark:text-[#c3c8ba] ${cls}`}
+              className={`my-2 text-base leading-7 text-[#555b50] dark:text-[#c3c8ba] ${cls}`}
             >
-              {b.type === 'image' && b.src ? (
+              {b.type === 'link' ? (
+                <button onClick={(e) => { e.stopPropagation(); onBlockClick(b); }} className="text-base text-orange underline underline-offset-4">{b.text}</button>
+              ) : b.type === 'heading' ? (
+                <h2 className={b.level === 1 ? 'mb-5 mt-3 text-3xl font-semibold text-ink dark:text-night-ink' : 'mb-2 mt-6 text-xl font-semibold text-ink dark:text-night-ink'}>{b.text}</h2>
+              ) : b.type === 'image' && b.src ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={b.src} alt={b.text} className="max-h-72 rounded-md border border-line" />
               ) : (

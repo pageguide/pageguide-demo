@@ -18,6 +18,9 @@ export interface Block {
   src?: string; // images (absolute URL)
   level?: number; // headings 1-6
   control?: boolean; // interactive (link/button/input) — a valid Guide target
+  value?: string; // observed current input value
+  multiline?: boolean;
+  group?: string; // layout group in trusted, data-only sandbox pages
 }
 
 export interface PageDoc {
@@ -27,6 +30,9 @@ export interface PageDoc {
   favicon?: string;
   blocks: Block[];
   html?: string; // sanitized full-page HTML for faithful display in an iframe
+  saved?: boolean; // original website HTML saved locally, with scripts removed
+  savedAt?: string;
+  sandbox?: 'amazon' | 'quora';
 }
 
 export interface SearchResult {
@@ -95,13 +101,26 @@ export interface GuideStep {
   evidence?: { name: string; imageId?: string; annotate?: string };
 }
 
-// A saved piece of evidence in the agent's scratchpad (ev:<name>), with an image.
+export interface EvidenceRequest {
+  name: string;
+  description?: string;
+  targetId?: string;
+  annotate?: string;
+}
+
+// Only agent-selected evidence goes into the scratchpad. Journey snapshots are separate.
 export interface Evidence {
   name: string; // e.g. "orange-added-to-cart"
+  label?: string;
+  step?: number;
+  annotation?: string;
   index: number; // 1-based badge number
   imageUrl: string;
   box?: [number, number, number, number]; // annotation bounding box (normalized)
   caption?: string;
+  observation?: string; // actual state at capture time, also provided to the summarizer
+  url?: string;
+  capturedAt?: string;
 }
 
 export interface AnnotateResult {

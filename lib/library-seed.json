@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "articles": [
+    { "id": "fetch-api", "title": "Fetch API", "site": "MDN Web Docs", "source": "https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API", "description": "The real MDN reference page, with its original HTML and layout." },
+    { "id": "blue-sky", "title": "Rayleigh scattering", "site": "Wikipedia", "source": "https://en.wikipedia.org/wiki/Rayleigh_scattering", "description": "The real Wikipedia article about light scattering and blue skies." },
+    { "id": "web-accessibility", "title": "Introduction to Web Accessibility", "site": "W3C WAI", "source": "https://www.w3.org/WAI/fundamentals/accessibility-intro/", "description": "The original W3C introduction, with its styles saved locally." },
+    { "id": "cold-war", "title": "Cold War", "site": "Wikipedia", "source": "https://en.wikipedia.org/wiki/Cold_War", "description": "Original saved Wikipedia page about the Cold War." },
+    { "id": "manhattan", "title": "Manhattan", "site": "Wikipedia", "source": "https://en.wikipedia.org/wiki/Manhattan", "description": "Original saved Wikipedia page about Manhattan, New York City." },
+    { "id": "roman-empire", "title": "Roman Empire", "site": "Wikipedia", "source": "https://en.wikipedia.org/wiki/Roman_Empire", "description": "Original saved Wikipedia page about the Roman Empire." }
+  ],
+  "products": [
+    { "id": "oranges", "name": "Fresh oranges", "emoji": "🍊", "price": 4.99, "description": "A bag of six sweet, juicy oranges. In stock. Ships from the demo market." },
+    { "id": "apples", "name": "Crisp apples", "emoji": "🍎", "price": 3.49, "description": "A bag of four crisp apples. In stock." },
+    { "id": "bananas", "name": "Organic bananas", "emoji": "🍌", "price": 2.29, "description": "A bunch of five organic bananas. In stock." },
+    { "id": "coffee", "name": "Ground coffee", "emoji": "☕", "price": 8.99, "description": "Medium-roast ground coffee, 250 g. In stock." },
+    { "id": "bread", "name": "Sourdough bread", "emoji": "🍞", "price": 5.49, "description": "One freshly baked sourdough loaf. In stock." },
+    { "id": "avocados", "name": "Ripe avocados", "emoji": "🥑", "price": 6.49, "description": "A pack of three ripe avocados. In stock." }
+  ],
+  "posts": [
+    {
+      "id": "growing-oranges", "title": "How do I grow an orange tree at home?", "topic": "Gardening", "author": "Maya Chen",
+      "body": "I have a sunny balcony and would love to grow citrus in a container. What should I know before buying a young orange tree?",
+      "answers": [
+        { "id": "citrus-care", "author": "Nora Patel", "credential": "Container gardener · fictional demo profile", "votes": 42, "text": "Choose a sunny location and a container with good drainage. Water when the top layer of soil dries out. In cold climates, move the tree indoors before frost. Container-grown citrus benefits from regular feeding during the growing season.", "comments": [ { "id": "c1", "author": "Maya Chen", "text": "The drainage tip is helpful. Would a terracotta pot work?" }, { "id": "c2", "author": "Nora Patel", "text": "Yes, as long as it has drainage holes and enough room for the root ball." } ] },
+        { "id": "citrus-variety", "author": "Luis Ortega", "credential": "Backyard fruit grower · fictional demo profile", "votes": 18, "text": "Start with a dwarf variety suited to your climate. A container tree needs consistent light and moisture, but avoid leaving its roots in standing water. Ask a local nursery which varieties do well nearby.", "comments": [ { "id": "c3", "author": "Owen Brooks", "text": "A local nursery helped me choose a compact variety too." }, { "id": "c4", "author": "Maya Chen", "text": "I will check local varieties before ordering one." } ] }
+      ]
+    },
+    {
+      "id": "fetch-errors", "title": "Why does fetch not reject on a 404 response?", "topic": "Programming", "author": "Sam Rivera",
+      "body": "My catch block handles a disconnected network, but it does not run when the server returns 404. Is that expected?",
+      "answers": [
+        { "id": "fetch-status", "author": "Priya Shah", "credential": "Frontend developer · fictional demo profile", "votes": 67, "text": "Fetch distinguishes network failures from HTTP responses. A 404 is still a response from the server. Check response.ok and throw an error yourself when you need to handle unsuccessful HTTP statuses.", "comments": [ { "id": "c5", "author": "Sam Rivera", "text": "That explains why my network-error test behaved differently." }, { "id": "c6", "author": "Jules Park", "text": "I put that status check in a shared request helper." } ] },
+        { "id": "fetch-body", "author": "Jules Park", "credential": "Builds web tools · fictional demo profile", "votes": 23, "text": "Keep status handling separate from parsing the body. An error response can still contain useful JSON describing the problem, so decide when to read it before throwing.", "comments": [ { "id": "c7", "author": "Sam Rivera", "text": "Good point about preserving the server error message." }, { "id": "c8", "author": "Priya Shah", "text": "Exactly. A small typed error wrapper can help." } ] }
+      ]
+    },
+    {
+      "id": "healthy-habits", "title": "What small habits make mornings easier?", "topic": "Everyday life", "author": "Alex Morgan",
+      "body": "I want a simple morning routine rather than a long checklist. Which small change has actually helped you?",
+      "answers": [
+        { "id": "morning-prep", "author": "Rae Ellis", "credential": "Enjoys simple routines · fictional demo profile", "votes": 35, "text": "Prepare what you need the night before, keep a consistent wake-up time, and start with a short task you can finish. A simple routine is often easier to maintain than an elaborate one.", "comments": [ { "id": "c9", "author": "Alex Morgan", "text": "Packing my bag at night sounds achievable." }, { "id": "c10", "author": "Rae Ellis", "text": "Start there and add another habit only when it feels automatic." } ] },
+        { "id": "morning-phone", "author": "Dev Singh", "credential": "Remote worker · fictional demo profile", "votes": 12, "text": "Leave the phone outside your bedroom if that works for you. I find it easier to begin the day intentionally when I do not read notifications before getting dressed.", "comments": [ { "id": "c11", "author": "Alex Morgan", "text": "I may try a separate alarm clock." }, { "id": "c12", "author": "Rae Ellis", "text": "A small change to the environment can reduce friction." } ] }
+      ]
+    },
+    {
+      "id": "balcony-herbs", "title": "Which herbs are easiest to grow on a small balcony?", "topic": "Gardening", "author": "Owen Brooks",
+      "body": "My balcony gets about four hours of sunlight. I want two or three herbs I can use in cooking.",
+      "answers": [
+        { "id": "herb-start", "author": "Nora Patel", "credential": "Container gardener · fictional demo profile", "votes": 29, "text": "Mint, parsley, and chives are practical starting points. Give mint its own pot because it spreads aggressively. Check your local growing conditions and water containers more often in hot weather.", "comments": [ { "id": "c13", "author": "Owen Brooks", "text": "Separating the mint is a useful warning!" }, { "id": "c14", "author": "Maya Chen", "text": "Chives have been very forgiving on my balcony." } ] },
+        { "id": "herb-light", "author": "Luis Ortega", "credential": "Backyard fruit grower · fictional demo profile", "votes": 14, "text": "Observe the light before buying plants. A balcony can be sunny at one time of year and shaded at another. Start small and move pots around to find the best location.", "comments": [ { "id": "c15", "author": "Owen Brooks", "text": "I will track the sun for a week." }, { "id": "c16", "author": "Nora Patel", "text": "That is a good way to avoid guessing." } ] }
+      ]
+    },
+    {
+      "id": "train-travel", "title": "What should I pack for my first overnight train trip?", "topic": "Travel", "author": "Leah Brooks",
+      "body": "I am taking an overnight train and want to avoid overpacking. What is worth keeping in an easily accessible bag?",
+      "answers": [
+        { "id": "train-basics", "author": "Ari Kim", "credential": "Frequent rail traveler · fictional demo profile", "votes": 54, "text": "Keep water, a snack, your ticket, a charger, and any essential medication in a small accessible bag. Earplugs and a light layer can help. Check the operator's rules for bedding and luggage before departure.", "comments": [ { "id": "c17", "author": "Leah Brooks", "text": "I had not thought about keeping the charger in the small bag." }, { "id": "c18", "author": "Ari Kim", "text": "It saves unpacking everything after boarding." } ] },
+        { "id": "train-space", "author": "Dev Singh", "credential": "Occasional traveler · fictional demo profile", "votes": 17, "text": "Pack so you can manage the luggage yourself in a narrow aisle. An eye mask is small, and a downloaded book or playlist is useful when connectivity is unreliable.", "comments": [ { "id": "c19", "author": "Leah Brooks", "text": "Downloading things in advance is a good reminder." }, { "id": "c20", "author": "Ari Kim", "text": "Especially on routes with long rural sections." } ] }
+      ]
+    },
+    {
+      "id": "bread-storage", "title": "How do I keep sourdough bread fresh for longer?", "topic": "Cooking", "author": "Eli Turner",
+      "body": "I bought a large loaf and cannot finish it in two days. Is refrigerating it a good idea?",
+      "answers": [
+        { "id": "bread-freeze", "author": "Mina Cole", "credential": "Home baker · fictional demo profile", "votes": 38, "text": "Slice and freeze the portion you will not eat soon, then toast slices from frozen. For short-term storage, keep the loaf covered at room temperature. Refrigeration can speed up staling.", "comments": [ { "id": "c21", "author": "Eli Turner", "text": "Slicing before freezing sounds much more convenient." }, { "id": "c22", "author": "Mina Cole", "text": "Separate slices first so you can take only what you need." } ] },
+        { "id": "bread-crust", "author": "Noah Reed", "credential": "Weekend cook · fictional demo profile", "votes": 11, "text": "Storage is a trade-off between a crisp crust and a softer loaf. I keep a small amount out and freeze the rest instead of trying to preserve an entire large loaf on the counter.", "comments": [ { "id": "c23", "author": "Eli Turner", "text": "That sounds like a sensible compromise." }, { "id": "c24", "author": "Mina Cole", "text": "Portioning helps reduce waste too." } ] }
+      ]
+    },
+    {
+      "id": "keyboard-design", "title": "What makes a website easier to use with only a keyboard?", "topic": "Design", "author": "Jules Park",
+      "body": "I am reviewing a small website and want a practical checklist for keyboard accessibility.",
+      "answers": [
+        { "id": "keyboard-focus", "author": "Priya Shah", "credential": "Frontend developer · fictional demo profile", "votes": 61, "text": "Make every interactive control reachable, keep focus visible, and preserve a logical tab order. Use real buttons and links, and check that dialogs do not trap users unexpectedly.", "comments": [ { "id": "c25", "author": "Jules Park", "text": "Visible focus was missing on several controls in my review." }, { "id": "c26", "author": "Priya Shah", "text": "Testing without a mouse often reveals those issues quickly." } ] },
+        { "id": "keyboard-labels", "author": "Rae Ellis", "credential": "Product researcher · fictional demo profile", "votes": 19, "text": "Give controls clear labels and do not rely on hover alone to reveal essential information. People should be able to understand and activate the same features with focus and keyboard input.", "comments": [ { "id": "c27", "author": "Jules Park", "text": "I will test the hover cards using focus too." }, { "id": "c28", "author": "Priya Shah", "text": "That is an important part of the checklist." } ] }
+      ]
+    },
+    {
+      "id": "sunset-colors", "title": "Why do sunsets sometimes look red or orange?", "topic": "Science", "author": "Noah Reed",
+      "body": "I understand the sky is often blue, but I would like a simple explanation for the colors near sunset.",
+      "answers": [
+        { "id": "sunset-path", "author": "Ari Kim", "credential": "Science enthusiast · fictional demo profile", "votes": 44, "text": "Near sunset, sunlight travels a longer path through the atmosphere. More of the shorter-wavelength light is scattered out of the direct path, so the remaining sunlight can appear warmer, redder, or more orange.", "comments": [ { "id": "c29", "author": "Noah Reed", "text": "The longer path is the part I was missing." }, { "id": "c30", "author": "Maya Chen", "text": "That is a clear explanation." } ] },
+        { "id": "sunset-weather", "author": "Leah Brooks", "credential": "Amateur photographer · fictional demo profile", "votes": 16, "text": "Clouds and particles in the air can also affect what you see, so not every sunset looks the same. The basic scattering explanation is a useful starting point rather than a complete weather forecast.", "comments": [ { "id": "c31", "author": "Noah Reed", "text": "That explains why the colors vary so much." }, { "id": "c32", "author": "Ari Kim", "text": "Yes, local atmospheric conditions matter." } ] }
+      ]
+    }
+  ]
+}
