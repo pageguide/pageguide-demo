@@ -59,6 +59,7 @@ test('loads a page and Find highlights the grounded passage', async ({ page }) =
 });
 
 test('Guide acts on the real sandbox state and shows both screenshots and on-page proof', async ({ page }) => {
+  test.setTimeout(60000);
   let agentCall = 0;
   await page.route('**/api/agent', (r) => {
     const request = r.request().postDataJSON();
@@ -70,11 +71,21 @@ test('Guide acts on the real sandbox state and shows both screenshots and on-pag
   });
   await page.goto('/');
   await page.getByRole('button', { name: /Amazon sandbox/ }).click();
+  await page.locator('[data-node-id="current-state"]').evaluate((el) => {
+    const range = el.ownerDocument.createRange(); range.selectNodeContents(el);
+    const selection = el.ownerDocument.getSelection()!; selection.removeAllRanges(); selection.addRange(range);
+    el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+  });
+  await expect(page.getByRole('complementary', { name: 'Selected text context' })).toBeVisible();
   await page.getByRole('button', { name: 'Guide: Add oranges to my cart', exact: true }).click();
   await expect(page.getByText('Completed', { exact: true })).toBeVisible({ timeout: 20000 });
   await expect(page.getByText('Reasoning Trail')).toHaveCount(0);
   await expect(page.getByText('Saved evidence (2)')).toBeVisible();
   const screenshots = page.getByRole('region', { name: 'Saved evidence' });
+  await expect(screenshots.locator('img')).toHaveCount(0);
+  const disclosure = screenshots.getByRole('button', { name: 'Saved evidence (2)', exact: true });
+  await expect(disclosure).toHaveAttribute('aria-expanded', 'false');
+  await disclosure.click();
   await expect(screenshots.locator('img')).toHaveCount(2);
   for (const image of await screenshots.locator('img').all()) {
     expect(await image.getAttribute('src')).toMatch(/^data:image\/png;base64,/);

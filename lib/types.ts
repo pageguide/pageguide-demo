@@ -32,7 +32,14 @@ export interface PageDoc {
   html?: string; // sanitized full-page HTML for faithful display in an iframe
   saved?: boolean; // original website HTML saved locally, with scripts removed
   savedAt?: string;
+  sourceFile?: string;
   sandbox?: 'amazon' | 'quora';
+}
+
+export interface PageSelection {
+  id: string;
+  text: string;
+  url: string;
 }
 
 export interface SearchResult {
@@ -150,6 +157,7 @@ export interface AskRequestBody {
   mode: Mode;
   question: string;
   doc: PageDoc;
+  selection?: PageSelection;
 }
 
 export interface SavedChat {

@@ -27,6 +27,7 @@ body {
 
 /* Quiet, warm extension panel inspired by a spacious assistant side sheet. */
 .pg-chat {
+  container-type: inline-size;
   background:
     radial-gradient(ellipse at 95% 100%, #ffba8059, transparent 65%),
     linear-gradient(175deg, #fffdfa 12%, #fff6ee 52%, #ffdcc0 100%);
@@ -47,6 +48,21 @@ body {
 .pg-chat button:focus-visible {
   outline: 2px solid #d76a31;
   outline-offset: 3px;
+}
+
+.pg-chat > header,
+.pg-chat-log,
+.pg-chat-composer {
+  padding-inline: clamp(12px, 4cqi, 20px);
+}
+.pg-guide-card {
+  overflow-wrap: anywhere;
+}
+.pg-evidence-grid {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
 }
 
 .library-card {

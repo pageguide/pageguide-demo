@@ -1,0 +1,32 @@
+{
+  "fetch-api": {
+    "version": "2404a8baedf6a7c8",
+    "sourceFile": "save-webpage/Fetch API - Web APIs ｜ MDN (11_3_2026 2：26：04 PM).html",
+    "bytes": 314311
+  },
+  "blue-sky": {
+    "version": "68559a88e850b133",
+    "sourceFile": "save-webpage/Rayleigh scattering - Wikipedia (11_3_2026 2：26：28 PM).html",
+    "bytes": 412885
+  },
+  "web-accessibility": {
+    "version": "3ae9008a3950bc0f",
+    "sourceFile": "save-webpage/Introduction to Web Accessibility ｜ Web Accessibility Initiative (WAI) ｜ W3C (11_3_2026 2：26：40 PM).html",
+    "bytes": 214620
+  },
+  "cold-war": {
+    "version": "4643af150ca5162a",
+    "sourceFile": "save-webpage/Cold War - Wikipedia (11_3_2026 11：37：00 AM).html",
+    "bytes": 2151263
+  },
+  "manhattan": {
+    "version": "c86b8f80a1427fe4",
+    "sourceFile": "save-webpage/Manhattan - Wikipedia (11_3_2026 11：36：47 AM).html",
+    "bytes": 2291111
+  },
+  "roman-empire": {
+    "version": "bf8aafa27b3f0484",
+    "sourceFile": "save-webpage/Roman Empire - Wikipedia (11_3_2026 11：36：36 AM).html",
+    "bytes": 3347465
+  }
+}

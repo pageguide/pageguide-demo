@@ -69,7 +69,10 @@ test('agent receives fresh Quora state, saves only selected evidence, and attach
   await page.getByRole('button', { name: /Quora sandbox/ }).click();
   await page.getByRole('button', { name: 'Guide: Change my language to Spanish', exact: true }).click();
   await expect(page.getByText('Completed', { exact: true })).toBeVisible({ timeout: 20000 });
-  await expect(page.getByRole('region', { name: 'Saved evidence' }).locator('img')).toHaveCount(1);
+  const saved = page.getByRole('region', { name: 'Saved evidence' });
+  await expect(saved.locator('img')).toHaveCount(0);
+  await saved.getByRole('button', { name: 'Saved evidence (1)', exact: true }).click();
+  await expect(saved.locator('img')).toHaveCount(1);
   await expect(page.getByText('spanish language saved', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'View Journey', exact: true })).toHaveAttribute('aria-expanded', 'true');
   await expect(page.getByRole('button', { name: /^View step/ })).toHaveCount(5);

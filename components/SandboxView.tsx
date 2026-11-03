@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useStore } from '@/lib/store';
 import type { Block, PageDoc } from '@/lib/types';
+import { readPageSelection } from '@/lib/page-selection';
 
 // No iframe scripts or untrusted HTML: every visible control is backed by the shared state reducer.
 export default function SandboxView({ doc }: { doc: PageDoc }) {
@@ -10,6 +11,7 @@ export default function SandboxView({ doc }: { doc: PageDoc }) {
   const focused = useStore((s) => s.focusedEvidence);
   const guide = useStore((s) => s.guide);
   const act = useStore((s) => s.actOnSandbox);
+  const setSelection = useStore((s) => s.setSelection);
   const running = useStore((s) => s.guideRun?.running);
   const root = useRef<HTMLDivElement>(null);
   const guideId = guide?.steps[guide.current]?.id;
@@ -53,7 +55,9 @@ export default function SandboxView({ doc }: { doc: PageDoc }) {
   const groups = Array.from(new Set(doc.blocks.map((b) => b.group).filter((g): g is string => Boolean(g && g !== 'navigation'))));
   return (
     <div className="pg-scroll h-full overflow-auto bg-[#f5f5f3]">
-      <div ref={root} data-sandbox-root className={`sandbox-page min-h-full bg-[#f5f5f3] text-[#252525] ${doc.sandbox === 'quora' ? 'sandbox-quora' : ''}`}>
+      <div ref={root} data-sandbox-root
+        onMouseUp={() => { const selected = root.current && readPageSelection(root.current, doc.url); if (selected) setSelection(selected); }}
+        onKeyUp={() => { const selected = root.current && readPageSelection(root.current, doc.url); if (selected) setSelection(selected); }} className={`sandbox-page min-h-full bg-[#f5f5f3] text-[#252525] ${doc.sandbox === 'quora' ? 'sandbox-quora' : ''}`}>
         <div className={`px-5 py-4 ${doc.sandbox === 'amazon' ? 'bg-[#192633] text-white' : 'border-b border-[#e5d9d5] bg-white'}`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <strong className={`text-2xl tracking-tight ${doc.sandbox === 'quora' ? 'font-serif text-[#a32721]' : ''}`}>{doc.sandbox === 'amazon' ? 'amazon' : 'Quora'}<span className="ml-2 font-sans text-xs font-normal opacity-70">SANDBOX</span></strong>

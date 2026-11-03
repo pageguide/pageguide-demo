@@ -26,6 +26,7 @@ export default function ExtensionSurface() {
     navIndex,
     openResult,
     setFieldValue,
+    setSelection,
     focusEvidence,
     showLibrary,
     resetSandbox,
@@ -44,9 +45,9 @@ export default function ExtensionSurface() {
   };
 
   return (
-    <div className="grid h-full grid-cols-1 grid-rows-[minmax(140px,0.6fr)_minmax(0,1fr)] overflow-hidden rounded-2xl border border-line bg-white shadow-panel dark:border-night-line dark:bg-night-panel lg:grid-cols-[minmax(0,1fr)_420px] lg:grid-rows-1">
+    <div className="grid h-full grid-cols-1 grid-rows-[minmax(140px,0.6fr)_minmax(0,1fr)] overflow-hidden rounded-2xl border border-line bg-white shadow-panel dark:border-night-line dark:bg-night-panel lg:grid-cols-[minmax(0,1fr)_clamp(320px,32vw,460px)] lg:grid-rows-1">
       {/* browser column */}
-      <div className="flex min-h-0 flex-col border-b border-line dark:border-night-line lg:border-b-0 lg:border-r">
+      <div className="flex min-h-0 min-w-0 flex-col border-b border-line dark:border-night-line lg:border-b-0 lg:border-r">
         {/* chrome */}
         <div className="flex items-center gap-2 border-b border-line bg-[#f8f8f4] px-3 py-2 dark:border-night-line dark:bg-night">
           <button aria-label="Open library" title="Open library" onClick={showLibrary} className="rounded-lg px-2 py-1.5 text-lg text-orange hover:bg-orange-soft">⌂</button>
@@ -113,6 +114,7 @@ export default function ExtensionSurface() {
               clicked={clicked}
               onBlockClick={onBlockClick}
               onFieldChange={setFieldValue}
+              onSelection={setSelection}
               onNavigate={(href) => void loadUrl(href)}
             />
           )}
@@ -120,7 +122,7 @@ export default function ExtensionSurface() {
       </div>
 
       {/* side panel column */}
-      <div className="min-h-0">
+      <div className="min-h-0 min-w-0">
         <SidePanel />
       </div>
     </div>

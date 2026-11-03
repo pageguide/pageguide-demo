@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { articleUrl } from '@/lib/library';
 import { sandboxUrl, type SandboxSite } from '@/lib/sandboxes';
+import { prefetchSavedPage } from '@/lib/saved-client';
 
 export const SANDBOX_TASKS: Record<SandboxSite, string[]> = {
   amazon: ['Add oranges to my cart', 'Buy oranges using demo checkout', 'Save coffee to my wishlist'],
@@ -13,6 +14,12 @@ export const SANDBOX_TASKS: Record<SandboxSite, string[]> = {
 export default function LibraryShelf() {
   const { library, pageError, loadUrl } = useStore();
   const [url, setUrl] = useState('');
+  useEffect(() => {
+    const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
+    if (connection?.saveData) return;
+    const timer = setTimeout(() => prefetchSavedPage('fetch-api'), 250);
+    return () => clearTimeout(timer);
+  }, []);
   return (
     <div className="pg-scroll h-full overflow-auto bg-[#fffaf6] dark:bg-night">
       <div className="mx-auto max-w-4xl px-5 py-8 md:px-8">
@@ -24,7 +31,7 @@ export default function LibraryShelf() {
           <h2 className="text-lg font-semibold text-ink dark:text-night-ink">Find <span className="ml-2 text-sm font-normal text-muted dark:text-night-muted">{library.articles.length} saved real websites</span></h2>
           <div className="mt-3 grid gap-3 xl:grid-cols-3">
             {library.articles.map((article, i) => (
-              <button key={article.id} onClick={() => void loadUrl(articleUrl(article.id, library))} className="library-card text-left">
+              <button key={article.id} onPointerEnter={() => prefetchSavedPage(article.id)} onFocus={() => prefetchSavedPage(article.id)} onClick={() => void loadUrl(articleUrl(article.id, library))} className="library-card text-left">
                 <span className="text-2xl" aria-hidden="true">{['⌘', '☀', '◎', '◷', '▦', '♜'][i]}</span>
                 <span className="mt-4 block text-xs font-semibold uppercase tracking-wide text-orange">{article.site}</span>
                 <span className="mt-1 block text-lg font-semibold">{article.title}</span>

@@ -15,6 +15,8 @@ The library offers:
 - **Guide — two isolated, working demo websites:** an Amazon-style market (six products, cart, wishlist, sample shipping, checkout/review, simulated card or wallet payment, order history and cancellation) and a Quora-style community (eight fictional questions, sixteen answers, thirty-two comments, posting questions/answers/comments, following topics, saved posts, voting and language settings). Neither connects to real accounts or makes real purchases.
 - **Custom websites:** enter a URL in the library. The browser location bar is read-only and follows page changes. Custom pages are sanitized snapshots; their original JavaScript and form submissions are disabled.
 
+Highlight text on a displayed page to attach an exact quoted excerpt above the composer. It stays attached while typing, can be removed, and is cleared on navigation. Questions such as “explain this” receive that selected text as source context, including selections outside the initial extracted blocks. Find citations are assembled inline after each supported claim rather than collected at the end.
+
 The panel keeps dark mode, clear chat, and send. `/find` and `/guide` force a mode; `/open <url>`, `/search <query>`, and `/clear` remain available. `/admin <password>` uses the existing local demo admin gate; `/admin off` locks it. Admins see recorded Find token totals/cost, not model labels. Guide usage is not yet included. This client-side admin gate is not authentication.
 
 ## Guide execution and screenshots
@@ -22,7 +24,7 @@ The panel keeps dark mode, clear chat, and send. `/find` and `/guide` force a mo
 The model proposes one action at a time. User clicks and agent actions share the same sandbox reducer. Each action changes actual demo state, and the next model turn receives the new observed page and input values.
 
 - **Journey snapshots:** Journey is expanded by default. The initial page and every subsequent step have a screenshot. Hover or keyboard-focus a step to preview its post-action state; click to enlarge. These are execution records, not automatically selected evidence.
-- **Saved evidence:** only screenshots explicitly selected by the agent enter the evidence gallery. Each has a descriptive name, a source step, and optional block-based annotation. Evidence markers also highlight the relevant confirmation on the page.
+- **Saved evidence:** the gallery is collapsed by default and includes only agent-selected screenshots cited in the final answer. It is not a step-by-step screenshot list. Inline citations remain hoverable/clickable while the gallery is closed; Journey retains the separate execution snapshots. Evidence cards adapt to the panel width. Optional annotations and on-page confirmation highlights are preserved.
 - The final summarizer receives actual outcomes and named evidence and is encouraged to cite it inline. The runtime, not the summarizer, controls completion status. No Reasoning Trail is displayed.
 - State-changing tasks are verified against actual sandbox state: requested cart quantities relative to the starting cart, a new paid demo order (not just an order review), saved preferences, published questions/answers/comments (not just drafts), votes, bookmarks and followed topics. Known compound checks must all pass.
 - Reading/explaining/navigation tasks use an independent page-evidence reviewer. Its supporting quotations must exist verbatim in current page blocks; navigation also requires the actual destination URL to match. The reviewer cannot approve unsupported mutations from a screenshot alone.
@@ -34,10 +36,11 @@ Guide requires an operator model API key. Set `OPENAI_API_KEY` or `OPENROUTER_AP
 
 ## Saved HTML and loading speed
 
-- `save-webpage/` contains the three original SingleFile Wikipedia pages supplied through Git LFS.
-- `public/saved/` contains prepared, sanitized delivery copies. The large Wikipedia pages are gzip-compressed ahead of time, so opening one does not parse megabytes of original HTML on the server.
-- The other three snapshots include their original styles/assets locally. In particular, W3C accessibility does not depend on loading its live stylesheet.
-- `GET /api/saved/:id` serves the local snapshots with browser caching. Custom pages have a bounded five-minute in-memory cache and an eight-second upstream timeout; Refresh bypasses custom-page caching.
+- `save-webpage/` is the source of truth for all six original SingleFile HTML pages supplied through Git LFS, including the newly added MDN, W3C, and Rayleigh scattering files.
+- `public/saved/` contains sanitized, precompressed copies generated only from those originals. `lib/saved-files.json` records the source filenames and `lib/saved-manifest.json` records version hashes and transfer sizes.
+- Browser navigation fetches versioned static `/saved/:id.json.gz` files directly, avoiding serverless cold starts, upstream requests, and per-request HTML parsing. Library hover/focus prefetches pages; the small Fetch API snapshot also prefetches after the library opens unless data saver is enabled. Requests are deduplicated and cached.
+- All six originals include their saved styles/assets. No live publisher stylesheet is needed. Refresh reloads the packaged original for a built-in page, never the live site.
+- `GET /api/saved/:id` and `/api/fetch` retain compatible local-snapshot responses. Custom pages have a bounded five-minute in-memory cache and an eight-second upstream timeout; Refresh bypasses custom-page caching.
 - The saved sites retain their source titles/URLs and layout, but dynamic site widgets cannot run without scripts. Links and same-page anchors remain usable.
 
 To rebuild delivery copies from changed Git LFS originals:
@@ -47,13 +50,7 @@ git lfs pull
 node scripts/prepare-saved-pages.mjs
 ```
 
-To refresh the first three pages from their original websites, run the dev server, then:
-
-```sh
-node scripts/save-find-pages.mjs
-# Or just one page:
-node scripts/save-find-pages.mjs web-accessibility
-```
+After updating any original in `save-webpage/`, rerun the preparation command and commit the regenerated delivery files/manifest. `scripts/save-find-pages.mjs` is now a local-only alias for the same preparation script; it no longer downloads or reconstructs websites.
 
 Keep source attribution and licensing when redistributing these snapshots. Do not replace snapshot JSON/HTML with untrusted executable content.
 

@@ -5,7 +5,9 @@ import { PROVIDERS } from './providers';
 import { LOCAL_LIBRARY, snapshotId, parseLibrary, type Library } from './library';
 import { sandboxSite, sandboxDoc, initialSandbox, routeSandbox, applySandboxAction, verifySandboxTask, type SandboxSite, type SandboxState, type BrowserAction } from './sandboxes';
 import { cachedPage, cachePage } from './page-cache';
+import { loadSavedPage } from './saved-client';
 import type { VerificationResult } from './verification';
+import { pageWithSelection } from './page-selection';
 import type {
   AskResult,
   AutoMode,
@@ -14,6 +16,7 @@ import type {
   GuideStep,
   Mode,
   PageDoc,
+  PageSelection,
   Provider,
   SavedChat,
   SearchResult,
@@ -50,6 +53,7 @@ export interface ChatMessage {
   result?: AskResult;
   error?: boolean;
   action?: boolean; // an "agent did X" log line
+  selection?: PageSelection;
 }
 
 export interface GuideState {
@@ -65,6 +69,7 @@ interface StoreState {
 
   browserView: BrowserView;
   doc: PageDoc | null;
+  selection: PageSelection | null;
   library: Library;
   sandboxSessions: Partial<Record<SandboxSite, SandboxState>>;
   pageError: string | null;
@@ -114,6 +119,7 @@ interface StoreState {
   performStep: (index?: number) => void;
   guideNext: () => void;
   setFieldValue: (id: string, v: string) => void;
+  setSelection: (selection: PageSelection | null) => void;
   focusEvidence: (id: string) => void;
   toggleJourney: () => void;
   toggleReasoning: () => void;
@@ -210,6 +216,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
   browserView: 'empty',
   doc: null,
+  selection: null,
   library: LOCAL_LIBRARY,
   sandboxSessions: {},
   pageError: null,
@@ -301,7 +308,7 @@ export const useStore = create<StoreState>((set, get) => ({
     navigationAbort?.abort();
     navigationId++;
     agentAbort?.abort();
-    set({ browserView: 'empty', doc: null, results: null, pageError: null, busy: false, guideRun: null, guide: null, evidence: [], focusedEvidence: null });
+    set({ browserView: 'empty', doc: null, selection: null, results: null, pageError: null, busy: false, guideRun: null, guide: null, evidence: [], focusedEvidence: null });
   },
 
   resetSandbox: () => {
@@ -309,7 +316,7 @@ export const useStore = create<StoreState>((set, get) => ({
     if (!site) return;
     agentAbort?.abort();
     const state = initialSandbox(site);
-    set({ sandboxSessions: { ...get().sandboxSessions, [site]: state }, doc: sandboxDoc(state, get().library), guide: null, guideRun: null, scratchpad: [], evidence: [], focusedEvidence: null, busy: false });
+    set({ sandboxSessions: { ...get().sandboxSessions, [site]: state }, selection: null, doc: sandboxDoc(state, get().library), guide: null, guideRun: null, scratchpad: [], evidence: [], focusedEvidence: null, busy: false });
   },
 
   actOnSandbox: (action) => {
@@ -327,7 +334,7 @@ export const useStore = create<StoreState>((set, get) => ({
     } else if (navIndex >= 0) {
       navStack = navStack.map((url, i) => i === navIndex ? doc.url : url);
     }
-    set({ sandboxSessions: { ...get().sandboxSessions, [site]: result.state }, doc, query: doc.url, navStack, navIndex, evidence: [], focusedEvidence: null });
+    set({ sandboxSessions: { ...get().sandboxSessions, [site]: result.state }, selection: null, doc, query: doc.url, navStack, navIndex, evidence: [], focusedEvidence: null });
     return result.observation;
   },
 
@@ -342,7 +349,7 @@ export const useStore = create<StoreState>((set, get) => ({
     if (!opts?.silent) { agentAbort?.abort(); set({ guideRun: null, busy: false }); }
     const push = opts?.push !== false;
     const silent = opts?.silent === true;
-    set({ pageError: null, results: null, evidence: [], focusedEvidence: null, guide: null, fieldValues: {}, clicked: [], query: url });
+    set({ pageError: null, selection: null, results: null, evidence: [], focusedEvidence: null, guide: null, fieldValues: {}, clicked: [], query: url });
     const timer = setTimeout(() => controller.abort(), 10000);
     try {
       new URL(url); // validate before any request
@@ -355,12 +362,9 @@ export const useStore = create<StoreState>((set, get) => ({
       } else {
         doc = !opts?.refresh ? cachedPage(url) : null;
         const saved = snapshotId(url, get().library);
-        if (!doc && saved && !opts?.refresh) {
+        if (!doc && saved) {
           set({ browserView: 'loading' });
-          const response = await fetch(`/api/saved/${saved}`, { signal: controller.signal });
-          const data = await response.json();
-          if (!response.ok) throw new Error(data?.error || 'The saved website could not be opened.');
-          doc = data as PageDoc;
+          doc = await loadSavedPage(saved, controller.signal, opts?.refresh);
           cachePage(url, doc);
         }
       }
@@ -429,8 +433,9 @@ export const useStore = create<StoreState>((set, get) => ({
     const { doc, settings } = get();
     const mode: Mode = forced || detectMode(q);
     const cleanQ = stripCmd(q);
+    const selection = get().selection?.url === doc?.url ? get().selection : null;
 
-    set({ messages: [...get().messages, { id: msgId++, role: 'user', text: cleanQ, mode }] });
+    set({ messages: [...get().messages, { id: msgId++, role: 'user', text: cleanQ, mode, ...(selection ? { selection } : {}) }] });
 
     // Greetings / small talk: answer locally, don't ground or spend tokens.
     if (/^(hi|hello|hey|yo|sup|hiya|howdy|thanks|thank you|ty|ok|okay|cool|nice|test|ping)[\s!.?]*$/i.test(cleanQ)) {
@@ -479,7 +484,7 @@ export const useStore = create<StoreState>((set, get) => ({
         },
       });
       try {
-        await runAgent(get, set, cleanQ, settings);
+        await runAgent(get, set, cleanQ, settings, selection);
       } catch (e: unknown) {
         const cur = get().guideRun;
         const msg = e instanceof Error ? e.message : 'The agent failed.';
@@ -501,7 +506,8 @@ export const useStore = create<StoreState>((set, get) => ({
           model: currentModel(settings),
           mode,
           question: cleanQ,
-          doc: { ...doc, html: undefined }, // the route only needs blocks, not the page HTML
+          doc: { ...pageWithSelection(doc, selection), html: undefined }, // no full HTML or screenshots in model input
+          ...(selection ? { selection } : {}),
         }),
       });
       const data = await res.json();
@@ -577,6 +583,11 @@ export const useStore = create<StoreState>((set, get) => ({
   guideNext: () => get().performStep(),
 
   setFieldValue: (id, v) => set({ fieldValues: { ...get().fieldValues, [id]: v } }),
+  setSelection: (selection) => {
+    if (selection && (selection.url !== get().doc?.url || !selection.text.trim())) return;
+    if (selection?.id === get().selection?.id && selection?.text === get().selection?.text) return;
+    set({ selection });
+  },
 
   saveChat: () => {
     const { doc, messages, query, history } = get();
@@ -644,7 +655,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
   clearChat: () => {
     agentAbort?.abort();
-    set({ messages: [], evidence: [], focusedEvidence: null, guide: null, guideRun: null, scratchpad: [], fieldValues: {}, clicked: [], busy: false });
+    set({ messages: [], selection: null, evidence: [], focusedEvidence: null, guide: null, guideRun: null, scratchpad: [], fieldValues: {}, clicked: [], busy: false });
   },
   reset: () => {
     navigationAbort?.abort();
@@ -652,6 +663,7 @@ export const useStore = create<StoreState>((set, get) => ({
     agentAbort?.abort();
     set({
       busy: false,
+      selection: null,
       browserView: 'empty',
       doc: null,
       results: null,
@@ -725,6 +737,7 @@ async function runAgent(
   set: (p: Partial<StoreState>) => void,
   task: string,
   settings: Settings,
+  selection: PageSelection | null,
 ) {
   const id = get().guideRun!.id;
   const signal = agentAbort!.signal;
@@ -734,7 +747,7 @@ async function runAgent(
   const history: { instruction: string; action: string; observation: string }[] = [];
   let finished = false;
   let failure = '';
-  await captureStep(get, set, 0, undefined, alive);
+  await captureStep(get, set, 0, undefined, alive, selection);
   try {
     for (let t = 0; t < MAX_AGENT_STEPS; t++) {
       if (!alive()) return;
@@ -743,7 +756,7 @@ async function runAgent(
       const res = await fetch('/api/agent', {
         method: 'POST', signal,
         headers: { 'Content-Type': 'application/json', 'x-provider-key': currentKey(settings) },
-        body: JSON.stringify({ provider: settings.provider, model: currentModel(settings), task, doc: { ...doc, html: undefined }, history, evidence: get().scratchpad.map((e) => e.name) }),
+        body: JSON.stringify({ provider: settings.provider, model: currentModel(settings), task, doc: { ...pageWithSelection(doc, doc.sandbox && history.length ? null : selection), html: undefined }, selection, history, evidence: get().scratchpad.map((e) => e.name) }),
       });
       const data = await res.json();
       if (!alive()) return;
@@ -759,7 +772,7 @@ async function runAgent(
       if (action.type === 'finish') {
         finished = true;
         set({ guide: null });
-        await captureStep(get, set, idx, evidence, alive);
+        await captureStep(get, set, idx, evidence, alive, selection);
         if (!alive()) return;
         setJourney(get, set, idx, 'done');
         break;
@@ -780,7 +793,7 @@ async function runAgent(
       }
       history.push({ instruction, action: `${action.type} ${action.id || action.url || ''}`, observation: observation.slice(0, 5000) });
       set({ guide: null });
-      await captureStep(get, set, idx, evidence, alive);
+      await captureStep(get, set, idx, evidence, alive, selection);
       if (!alive()) return;
       setJourney(get, set, idx, 'done');
     }
@@ -789,7 +802,7 @@ async function runAgent(
     failure = e instanceof Error ? e.message : 'The action failed.';
     const idx = get().guideRun!.journey.length - 1;
     setJourney(get, set, idx, 'failed');
-    await captureStep(get, set, idx, undefined, alive);
+    await captureStep(get, set, idx, undefined, alive, selection);
   }
   if (!alive()) return;
   set({ guide: null });
@@ -806,7 +819,7 @@ async function runAgent(
       const res = await fetch('/api/verify', {
         method: 'POST', signal,
         headers: { 'Content-Type': 'application/json', 'x-provider-key': currentKey(settings) },
-        body: JSON.stringify({ provider: settings.provider, model: currentModel(settings), task, doc: { ...get().doc, html: undefined }, history }),
+        body: JSON.stringify({ provider: settings.provider, model: currentModel(settings), task, doc: { ...pageWithSelection(get().doc!, get().doc?.sandbox ? null : selection), html: undefined }, selection, history }),
       });
       const result = await res.json();
       if (!alive()) return;
@@ -823,7 +836,8 @@ async function runAgent(
   const answer = verified.answer;
   const status = failure ? 'Failed' : completed ? 'Completed' : 'Incomplete';
   const selected = get().scratchpad;
-  const references = selected.map((e) => `[EV:${e.name}]`).join(' ');
+  // A fallback can cite the last explicitly selected proof, not dump the whole run into the answer.
+  const references = selected.slice(-1).map((e) => `[EV:${e.name}]`).join(' ');
   let finalAnswer = `${answer}${references ? ` ${references}` : ' No screenshot evidence was selected; see Journey for action snapshots.'}`;
   // The model writes the answer from actual outcomes and explicitly selected evidence.
   // The verified runtime status cannot be upgraded by the summarizer.
@@ -841,7 +855,6 @@ async function runAgent(
       if (!alive()) return;
       if (res.ok && typeof result.answer === 'string' && result.answer.trim()) {
         finalAnswer = result.answer.replace(/\[EV:([^\]]+)\]/g, (ref: string, name: string) => selected.some((e) => e.name === name) ? ref : '');
-        if (!/\[EV:/.test(finalAnswer) && references) finalAnswer += ` ${references}`;
       }
     } catch { /* Keep the truthful, source-linked runtime fallback. */ }
   }
@@ -856,9 +869,11 @@ async function captureStep(
   step: number,
   ev: EvidenceRequest | undefined,
   alive: () => boolean,
+  selection: PageSelection | null,
 ): Promise<void> {
-  const doc = get().doc;
-  if (!doc || !alive()) return;
+  const currentDoc = get().doc;
+  if (!currentDoc || !alive()) return;
+  const doc = pageWithSelection(currentDoc, currentDoc.sandbox && step > 0 ? null : selection);
   const previousEvidence = get().evidence;
   const index = get().scratchpad.length + 1;
   const requestedTarget = ev?.targetId && doc.blocks.some((b) => b.id === ev.targetId) ? ev.targetId : null;
