@@ -26,9 +26,17 @@ export default function SidePanel({ onOpenSettings }: { onOpenSettings: () => vo
     toggleHistory,
     loadChat,
     deleteChat,
+    devMode,
+    toggleDev,
+    admin,
+    unlockAdmin,
+    lockAdmin,
   } = useStore();
   const [input, setInput] = useState('');
   const [autoOpen, setAutoOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [adminPw, setAdminPw] = useState('');
+  const [adminErr, setAdminErr] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -70,9 +78,16 @@ export default function SidePanel({ onOpenSettings }: { onOpenSettings: () => vo
           <IconBtn label="Save chat" onClick={saveChat}>
             ⤓
           </IconBtn>
-          <IconBtn label="Settings" onClick={onOpenSettings}>
-            ⚙
-          </IconBtn>
+          {admin && (
+            <IconBtn label={devMode ? 'Dev inspector: on' : 'Dev inspector'} onClick={toggleDev} active={devMode}>
+              🔧
+            </IconBtn>
+          )}
+          {admin && (
+            <IconBtn label="Settings" onClick={onOpenSettings}>
+              ⚙
+            </IconBtn>
+          )}
         </div>
       </div>
 
@@ -155,8 +170,12 @@ export default function SidePanel({ onOpenSettings }: { onOpenSettings: () => vo
 
       {/* composer */}
       <div className="border-t border-line px-3 py-3 dark:border-night-line">
-        <div className="rounded-xl border border-line bg-cream px-3 py-2 dark:border-night-line dark:bg-night">
+        <div
+          suppressHydrationWarning
+          className="rounded-xl border border-line bg-cream px-3 py-2 dark:border-night-line dark:bg-night"
+        >
           <textarea
+            suppressHydrationWarning
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -203,6 +222,71 @@ export default function SidePanel({ onOpenSettings }: { onOpenSettings: () => vo
                 </div>
               )}
             </div>
+            <div className="relative">
+              <button
+                onClick={() => setMoreOpen((v) => !v)}
+                aria-label="More"
+                className="px-1 text-muted hover:text-ink dark:text-night-muted"
+              >
+                ···
+              </button>
+              {moreOpen && (
+                <div className="absolute bottom-8 left-0 z-20 w-56 rounded-lg border border-line bg-white p-2 text-[11px] shadow-panel dark:border-night-line dark:bg-night-panel">
+                  {admin ? (
+                    <button
+                      onClick={() => {
+                        lockAdmin();
+                        setMoreOpen(false);
+                      }}
+                      className="block w-full rounded px-2 py-1.5 text-left hover:bg-cream dark:hover:bg-night"
+                    >
+                      🔓 Admin mode on — click to lock
+                    </button>
+                  ) : (
+                    <div>
+                      <div className="mb-1 font-medium text-ink dark:text-night-ink">🔒 Admin mode</div>
+                      <input
+                        type="password"
+                        value={adminPw}
+                        autoComplete="off"
+                        placeholder="Password"
+                        onChange={(e) => {
+                          setAdminPw(e.target.value);
+                          setAdminErr(false);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            if (unlockAdmin(adminPw)) {
+                              setMoreOpen(false);
+                              setAdminPw('');
+                            } else setAdminErr(true);
+                          }
+                        }}
+                        className="w-full rounded border border-line bg-cream px-2 py-1 text-[11px] text-ink outline-none focus:border-orange dark:border-night-line dark:bg-night dark:text-night-ink"
+                      />
+                      <div className="mt-1.5 flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            if (unlockAdmin(adminPw)) {
+                              setMoreOpen(false);
+                              setAdminPw('');
+                              setAdminErr(false);
+                            } else setAdminErr(true);
+                          }}
+                          className="rounded bg-ink px-2 py-1 text-[10px] font-medium text-white dark:bg-orange"
+                        >
+                          Unlock
+                        </button>
+                        {adminErr && <span className="text-[10px] text-[#9b6443]">Wrong password</span>}
+                      </div>
+                      <p className="mt-1.5 text-[9px] leading-snug text-muted dark:text-night-muted">
+                        Unlocks Settings and the developer inspector.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
             <button
               onClick={submit}
               disabled={busy}
@@ -226,13 +310,25 @@ export default function SidePanel({ onOpenSettings }: { onOpenSettings: () => vo
   );
 }
 
-function IconBtn({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
+function IconBtn({
+  label,
+  onClick,
+  children,
+  active,
+}: {
+  label: string;
+  onClick: () => void;
+  children: ReactNode;
+  active?: boolean;
+}) {
   return (
     <div className="group relative flex items-center">
       <button
         onClick={onClick}
         aria-label={label}
-        className="text-[20px] leading-none text-muted transition-colors hover:text-ink dark:text-night-muted dark:hover:text-night-ink"
+        className={`text-[20px] leading-none transition-colors ${
+          active ? 'text-orange' : 'text-muted hover:text-ink dark:text-night-muted dark:hover:text-night-ink'
+        }`}
       >
         {children}
       </button>
@@ -351,6 +447,7 @@ function Message({
   const isFind = m.result?.kind === 'find';
   const citations = isFind ? m.result.citations || [] : [];
   const visual = isFind ? m.result.visual : null;
+  const devMode = useStore((s) => s.devMode);
   return (
     <div className={`text-[12px] leading-relaxed ${m.error ? 'text-[#9b6443]' : 'text-[#5a6350] dark:text-[#c3c8ba]'}`}>
       {!m.error && (
@@ -363,7 +460,30 @@ function Message({
       </p>
       {visual && <VisualEvidence v={visual} />}
       {m.result?.usage && <UsageLine usage={m.result.usage} />}
+      {devMode && m.result?.debug && <DebugPanel debug={m.result.debug} />}
     </div>
+  );
+}
+
+function DebugPanel({ debug }: { debug: import('@/lib/types').AskDebug }) {
+  const Block = ({ title, body }: { title: string; body: string }) => (
+    <div className="mt-1.5">
+      <div className="text-[9px] font-semibold uppercase tracking-wide text-[#8c6b3b]">{title}</div>
+      <pre className="pg-scroll mt-0.5 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-[#1b1e1a] px-2 py-1.5 text-[9.5px] leading-snug text-[#c9e2cb]">
+        {body || '(empty)'}
+      </pre>
+    </div>
+  );
+  return (
+    <details className="mt-2 rounded-lg border border-[#e1d8bf] bg-[#faf7ef] px-2 py-1.5 dark:border-night-line dark:bg-night">
+      <summary className="cursor-pointer text-[10px] font-semibold text-[#8c6b3b]">
+        🔧 Inspect ({debug.provider} · {debug.model})
+      </summary>
+      <Block title="System prompt" body={debug.system} />
+      <Block title="Input (page blocks + question)" body={debug.input} />
+      {debug.images.length > 0 && <Block title={`Input images (${debug.images.length})`} body={debug.images.join('\n')} />}
+      <Block title="Raw model output" body={debug.rawOutput} />
+    </details>
   );
 }
 

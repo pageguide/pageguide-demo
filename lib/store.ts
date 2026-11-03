@@ -63,9 +63,14 @@ interface StoreState {
   historyOpen: boolean;
 
   serverKeys: { openai: boolean; openrouter: boolean };
+  devMode: boolean;
+  admin: boolean;
 
   hydrate: () => void;
   loadConfig: () => Promise<void>;
+  toggleDev: () => void;
+  unlockAdmin: (pw: string) => boolean;
+  lockAdmin: () => void;
   setSurface: (s: Surface) => void;
   patchSettings: (p: Partial<Settings>) => void;
   toggleDark: () => void;
@@ -178,6 +183,17 @@ export const useStore = create<StoreState>((set, get) => ({
   historyOpen: false,
 
   serverKeys: { openai: false, openrouter: false },
+  devMode: false,
+  admin: false,
+
+  toggleDev: () => set({ devMode: !get().devMode }),
+  // Soft admin gate for the demo (not real security — the check runs in the browser).
+  unlockAdmin: (pw) => {
+    const ok = pw === 'admin2026pageguide';
+    if (ok) set({ admin: true });
+    return ok;
+  },
+  lockAdmin: () => set({ admin: false, devMode: false }),
 
   loadConfig: async () => {
     try {
@@ -291,6 +307,21 @@ export const useStore = create<StoreState>((set, get) => ({
     const cleanQ = stripCmd(q);
 
     set({ messages: [...get().messages, { id: msgId++, role: 'user', text: cleanQ, mode }] });
+
+    // Greetings / small talk: answer locally, don't ground or spend tokens.
+    if (/^(hi|hello|hey|yo|sup|hiya|howdy|thanks|thank you|ty|ok|okay|cool|nice|test|ping)[\s!.?]*$/i.test(cleanQ)) {
+      set({
+        messages: [
+          ...get().messages,
+          {
+            id: msgId++,
+            role: 'assistant',
+            text: 'Hi! Ask a question about this page and I’ll Find the answer with evidence, or ask how to do something to start a Guide.',
+          },
+        ],
+      });
+      return;
+    }
 
     if (!doc) {
       set({

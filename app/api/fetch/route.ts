@@ -64,10 +64,11 @@ export async function POST(req: NextRequest) {
       },
     });
     if (!res.ok) {
-      return NextResponse.json(
-        { error: `The site returned HTTP ${res.status}. It may block automated requests.` },
-        { status: 502 },
-      );
+      const blocked = [401, 403, 404, 429, 503].includes(res.status);
+      const msg = blocked
+        ? `This site blocked the demo’s request (HTTP ${res.status}). Big retailers (e.g. Amazon), social networks, and bot-protected pages refuse automated reads. Try a content page — Wikipedia, MDN, docs, or a news/blog article work well.`
+        : `The site returned HTTP ${res.status} and couldn’t be loaded.`;
+      return NextResponse.json({ error: msg }, { status: 502 });
     }
     const ctype = res.headers.get('content-type') || '';
     if (!/text\/html|application\/xhtml/i.test(ctype)) {

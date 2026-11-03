@@ -38,6 +38,8 @@ Write a concise answer that cites the page with inline markers: [1], [2]… for 
  "visual": {"marker": "V1", "id": "<image block id>", "box": [x, y, w, h], "caption": "<what the box shows>"} }
 - Every citation "id" MUST be a text block id (heading/paragraph/listitem/quote) from the page.
 - Use "visual" ONLY when one of the provided IMAGE blocks supports the answer: "id" is that image's block id and "box" is the region of THAT image supporting the answer as normalized [x, y, width, height], each 0..1 from the image's top-left corner. Otherwise set "visual" to null.
+- If the user's message is a greeting, small talk, or NOT a question about this page (e.g. "hi", "hello", "thanks"), do NOT answer from the page: set "answer" to a short note inviting them to ask something about the page, and return "citations": [] and "visual": null. Never fabricate an answer or a citation.
+- If the page does not contain the answer, say so plainly and return empty "citations". Never invent facts or citations.
 - Keep the answer under 90 words, plain text; the markers are the only square brackets.
 
 If mode is "guide":
@@ -178,6 +180,14 @@ export async function POST(req: NextRequest) {
       estimated = true;
     }
     const usage = { prompt, completion, total, cost, estimated };
+    const debug = {
+      provider,
+      model,
+      system: SYSTEM,
+      input: userJson,
+      images: imageBlocks.map((b) => b.src as string),
+      rawOutput: content,
+    };
     let parsed: any;
     try {
       parsed = JSON.parse(content);
@@ -232,7 +242,7 @@ export async function POST(req: NextRequest) {
           caption: typeof v.caption === 'string' ? v.caption.slice(0, 200) : undefined,
         };
       }
-      return NextResponse.json({ kind: 'find', answer, citations, visual, usage });
+      return NextResponse.json({ kind: 'find', answer, citations, visual, usage, debug });
     }
 
     // guide
@@ -255,7 +265,7 @@ export async function POST(req: NextRequest) {
         const value = action === 'fill' && typeof s.value === 'string' ? s.value.slice(0, 200) : undefined;
         return { id: s.id, instruction: s.instruction, action, ...(value ? { value } : {}) };
       });
-    return NextResponse.json({ kind: 'guide', answer, steps, usage });
+    return NextResponse.json({ kind: 'guide', answer, steps, usage, debug });
   } catch (err: unknown) {
     const aborted = err instanceof Error && err.name === 'AbortError';
     return NextResponse.json(

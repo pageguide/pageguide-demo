@@ -63,12 +63,23 @@ export interface VisualEvidence {
   caption?: string;
 }
 
+// Raw request/response captured for the developer inspector.
+export interface AskDebug {
+  provider: string;
+  model: string;
+  system: string;
+  input: string; // the user text (page blocks + question) sent to the model
+  images: string[]; // image URLs sent to the vision model
+  rawOutput: string; // the model's raw JSON string
+}
+
 export interface FindResult {
   kind: 'find';
   answer: string;
   citations: TextCitation[];
   visual: VisualEvidence | null;
   usage?: Usage;
+  debug?: AskDebug;
 }
 
 export type GuideAction = 'open' | 'click' | 'fill';
@@ -85,6 +96,7 @@ export interface GuideResult {
   answer: string;
   steps: GuideStep[];
   usage?: Usage;
+  debug?: AskDebug;
 }
 
 export type AskResult = FindResult | GuideResult;
