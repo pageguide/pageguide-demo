@@ -34,16 +34,21 @@ Return ONLY a JSON object, no prose outside it.
 If mode is "find":
 Write a concise answer that cites the page with inline markers: [1], [2]… for textual evidence, and [V1] for ONE visual exhibit when a provided IMAGE supports the answer. Put each marker right after the clause it supports.
 {"answer": "<answer text containing [1],[2],[V1] markers>",
- "citations": [{"marker": "1", "id": "<id of the text block supporting it>"}],
+ "citations": [{"marker": "1", "id": "<id of the text block supporting it>", "quote": "<exact verbatim phrase/sentence from that block that supports the answer>"}],
  "visual": {"marker": "V1", "id": "<image block id>", "box": [x, y, w, h], "caption": "<what the box shows>"} }
 - Every citation "id" MUST be a text block id (heading/paragraph/listitem/quote) from the page.
+- "quote" MUST be an exact, verbatim substring of that block's text — the specific sentence or phrase that supports the point, NOT the whole block. Copy it character-for-character.
 - Use "visual" ONLY when one of the provided IMAGE blocks supports the answer: "id" is that image's block id and "box" is the region of THAT image supporting the answer as normalized [x, y, width, height], each 0..1 from the image's top-left corner. Otherwise set "visual" to null.
+- If the user's message is a greeting, small talk, or NOT a question about this page (e.g. "hi", "hello", "thanks"), do NOT answer from the page: set "answer" to a short note inviting them to ask something about the page, and return "citations": [] and "visual": null. Never fabricate an answer or a citation.
+- If the page does not contain the answer, say so plainly and return empty "citations". Never invent facts or citations.
 - Keep the answer under 90 words, plain text; the markers are the only square brackets.
 
 If mode is "guide":
-{"answer": "<one short sentence framing the task>", "steps": [{"id": "<control block id>", "instruction": "<what to do>", "action": "open|click|fill", "value": "<text to type, only for fill>"}]}
+You are an autonomous web agent: observe the page state and emit a plan of actions the browser will perform for the user.
+{"answer": "<one short sentence framing the task>", "steps": [{"id": "<control block id>", "instruction": "<what to do>", "action": "open|click|fill", "value": "<text to type, only for fill>", "evidence": {"name": "<short-kebab-name>", "imageId": "<a page IMAGE block id to capture>", "annotate": "<what to highlight in that image>"}}]}
 - Use at most 6 steps. Each "id" MUST be an id from the provided blocks that has "control": true.
 - "action": use "open" to follow a link, "click" to press a button, "fill" to type into an input field. For "fill", include a short realistic "value".
+- You may ALSO save evidence at any step by adding an "evidence" object: "name" is a short kebab id (e.g. orange-added-to-cart), "imageId" is the id of a page IMAGE block to use as the evidence screenshot, and optional "annotate" describes what to highlight in that image. Save evidence at key moments — especially a final confirmation step.
 - Order steps the way a user would follow them. If the page cannot support the task, return an empty steps array and explain in "answer".
 
 Keep "answer" under 100 words. Use plain text only (no markdown, no HTML).`;
@@ -178,6 +183,14 @@ export async function POST(req: NextRequest) {
       estimated = true;
     }
     const usage = { prompt, completion, total, cost, estimated };
+    const debug = {
+      provider,
+      model,
+      system: SYSTEM,
+      input: userJson,
+      images: imageBlocks.map((b) => b.src as string),
+      rawOutput: content,
+    };
     let parsed: any;
     try {
       parsed = JSON.parse(content);
@@ -201,10 +214,20 @@ export async function POST(req: NextRequest) {
       );
       const imageById = new Map(blocks.filter((b) => b.type === 'image' && b.src).map((b) => [b.id, b]));
 
+      const textById = new Map(blocks.map((b) => [b.id, b.text]));
+      const norm = (s: string) => s.replace(/\s+/g, ' ').trim().toLowerCase();
       const citations = (Array.isArray(parsed?.citations) ? parsed.citations : [])
         .filter((c: any) => c && typeof c.id === 'string' && textAllow.has(c.id))
         .slice(0, 8)
-        .map((c: any) => ({ marker: String(c.marker ?? ''), id: c.id }));
+        .map((c: any) => {
+          // keep the quote only if it's genuinely a substring of the block text
+          let quote: string | undefined;
+          if (typeof c.quote === 'string' && c.quote.trim()) {
+            const blockText = textById.get(c.id) || '';
+            if (norm(blockText).includes(norm(c.quote))) quote = c.quote.trim();
+          }
+          return { marker: String(c.marker ?? ''), id: c.id, ...(quote ? { quote } : {}) };
+        });
 
       let visual: {
         marker: string;
@@ -232,11 +255,12 @@ export async function POST(req: NextRequest) {
           caption: typeof v.caption === 'string' ? v.caption.slice(0, 200) : undefined,
         };
       }
-      return NextResponse.json({ kind: 'find', answer, citations, visual, usage });
+      return NextResponse.json({ kind: 'find', answer, citations, visual, usage, debug });
     }
 
     // guide
     const typeById = new Map(blocks.map((b) => [b.id, b.type]));
+    const imageIds = new Set(blocks.filter((b) => b.type === 'image' && b.src).map((b) => b.id));
     const rawSteps = Array.isArray(parsed?.steps) ? parsed.steps : [];
     const steps = rawSteps
       .filter(
@@ -253,9 +277,18 @@ export async function POST(req: NextRequest) {
         const inferred = t === 'link' ? 'open' : t === 'input' ? 'fill' : 'click';
         const action = ['open', 'click', 'fill'].includes(s.action) ? s.action : inferred;
         const value = action === 'fill' && typeof s.value === 'string' ? s.value.slice(0, 200) : undefined;
-        return { id: s.id, instruction: s.instruction, action, ...(value ? { value } : {}) };
+        let evidence: { name: string; imageId?: string; annotate?: string } | undefined;
+        const ev = s.evidence;
+        if (ev && typeof ev.name === 'string' && ev.name.trim()) {
+          evidence = {
+            name: ev.name.trim().replace(/[^a-z0-9-]+/gi, '-').toLowerCase().slice(0, 60),
+            ...(typeof ev.imageId === 'string' && imageIds.has(ev.imageId) ? { imageId: ev.imageId } : {}),
+            ...(typeof ev.annotate === 'string' ? { annotate: ev.annotate.slice(0, 200) } : {}),
+          };
+        }
+        return { id: s.id, instruction: s.instruction, action, ...(value ? { value } : {}), ...(evidence ? { evidence } : {}) };
       });
-    return NextResponse.json({ kind: 'guide', answer, steps, usage });
+    return NextResponse.json({ kind: 'guide', answer, steps, usage, debug });
   } catch (err: unknown) {
     const aborted = err instanceof Error && err.name === 'AbortError';
     return NextResponse.json(

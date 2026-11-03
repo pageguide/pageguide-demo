@@ -1,98 +1,113 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useStore } from '@/lib/store';
 import PageView from '@/components/PageView';
 import SidePanel from '@/components/SidePanel';
+import LibraryShelf, { SANDBOX_TASKS } from '@/components/LibraryShelf';
+import SandboxView from '@/components/SandboxView';
 import type { Block } from '@/lib/types';
 
-function looksLikeUrl(t: string): boolean {
-  if (/\s/.test(t.trim())) return false;
-  return /^https?:\/\//i.test(t) || /^[\w-]+(\.[\w-]+)+(\/|$)/.test(t.trim());
-}
-
-export default function ExtensionSurface({ onOpenSettings }: { onOpenSettings: () => void }) {
+export default function ExtensionSurface() {
   const {
     browserView,
     doc,
     results,
-    pageError,
     query,
-    highlightId,
+    evidence,
+    focusedEvidence,
     guide,
+    guideRun,
     fieldValues,
     clicked,
     loadUrl,
-    search,
+    goBack,
+    goForward,
+    navStack,
+    navIndex,
     openResult,
-    performStep,
     setFieldValue,
+    focusEvidence,
+    showLibrary,
+    resetSandbox,
+    ask,
+    busy,
   } = useStore();
-  const [addr, setAddr] = useState('');
-
-  // Keep the address bar in sync with the page actually loaded (incl. link clicks).
-  useEffect(() => {
-    if (doc?.url) setAddr(doc.url);
-  }, [doc?.url]);
-
-  const go = () => {
-    const t = addr.trim();
-    if (!t) return;
-    if (looksLikeUrl(t)) void loadUrl(t);
-    else void search(t);
-  };
+  const location = browserView === 'empty' ? 'PageGuide library' : browserView === 'loading' ? query : browserView === 'results' ? `Search: ${query}` : doc?.url || 'PageGuide library';
 
   const guideTarget = guide && guide.current < guide.steps.length ? guide.steps[guide.current].id : null;
 
+  const evidenceIds = new Set(evidence.map((e) => e.id));
   const onBlockClick = (b: Block) => {
-    if (guideTarget && b.id === guideTarget) return performStep();
+    if (guideRun?.running) return; // the agent is driving — ignore manual clicks
+    if (evidenceIds.has(b.id)) return focusEvidence(b.id); // clicking a highlight focuses it
     if (b.type === 'link' && b.href) void loadUrl(b.href);
   };
 
   return (
-    <div className="grid h-full grid-cols-1 overflow-hidden rounded-2xl border border-line bg-white shadow-panel dark:border-night-line dark:bg-night-panel lg:grid-cols-[minmax(0,1fr)_380px]">
+    <div className="grid h-full grid-cols-1 grid-rows-[minmax(140px,0.6fr)_minmax(0,1fr)] overflow-hidden rounded-2xl border border-line bg-white shadow-panel dark:border-night-line dark:bg-night-panel lg:grid-cols-[minmax(0,1fr)_420px] lg:grid-rows-1">
       {/* browser column */}
       <div className="flex min-h-0 flex-col border-b border-line dark:border-night-line lg:border-b-0 lg:border-r">
         {/* chrome */}
         <div className="flex items-center gap-2 border-b border-line bg-[#f8f8f4] px-3 py-2 dark:border-night-line dark:bg-night">
-          <div className="flex gap-1.5">
+          <button aria-label="Open library" title="Open library" onClick={showLibrary} className="rounded-lg px-2 py-1.5 text-lg text-orange hover:bg-orange-soft">⌂</button>
+          <div className="hidden gap-1.5 xl:flex">
             <i className="h-2.5 w-2.5 rounded-full bg-[#e1b8a6]" />
             <i className="h-2.5 w-2.5 rounded-full bg-[#e0d0a0]" />
             <i className="h-2.5 w-2.5 rounded-full bg-[#bdcdb0]" />
           </div>
-          <div className="flex flex-1 items-center gap-2 rounded-lg border border-line bg-white px-3 py-1.5 dark:border-night-line dark:bg-night-panel">
-            <span className="text-[11px] text-muted">🔎</span>
-            <input
-              value={addr}
-              onChange={(e) => setAddr(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && go()}
-              placeholder="Enter a URL, or type to search the web…"
-              className="w-full bg-transparent text-[12px] text-ink outline-none placeholder:text-muted dark:text-night-ink"
-            />
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={goBack}
+              disabled={navIndex <= 0}
+              title="Back"
+              aria-label="Back"
+              className="flex h-6 w-6 items-center justify-center rounded-md text-[15px] text-muted enabled:hover:bg-line/50 enabled:hover:text-ink disabled:opacity-30 dark:text-night-muted dark:enabled:hover:text-night-ink"
+            >
+              ‹
+            </button>
+            <button
+              onClick={goForward}
+              disabled={navIndex >= navStack.length - 1}
+              title="Forward"
+              aria-label="Forward"
+              className="flex h-6 w-6 items-center justify-center rounded-md text-[15px] text-muted enabled:hover:bg-line/50 enabled:hover:text-ink disabled:opacity-30 dark:text-night-muted dark:enabled:hover:text-night-ink"
+            >
+              ›
+            </button>
           </div>
-          <button
-            onClick={go}
-            className="rounded-lg bg-ink px-3 py-1.5 text-[11px] font-medium text-white hover:bg-[#45503f] dark:bg-orange"
-          >
-            Go
-          </button>
+          <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 dark:border-night-line dark:bg-night-panel">
+            <span aria-hidden="true" className="text-xs text-muted">◎</span>
+            <span data-testid="browser-location" title={location} className="block min-w-0 truncate text-sm text-ink dark:text-night-ink">{location}</span>
+          </div>
+          {doc && <button aria-label="Refresh page" title="Refresh page" onClick={() => void loadUrl(doc.url, { push: false, refresh: true })} className="px-1 text-xl text-muted">↻</button>}
         </div>
 
+        {doc?.sandbox && browserView === 'page' && (
+          <div className="pg-scroll flex shrink-0 items-center gap-2 overflow-x-auto border-b border-orange-ring bg-orange-soft/50 px-3 py-2 dark:border-night-line dark:bg-night">
+            {SANDBOX_TASKS[doc.sandbox].map((task) => <button key={task} disabled={busy} onClick={() => void ask(task, 'guide')} className="shrink-0 whitespace-nowrap rounded-full border border-orange-ring bg-white px-3 py-1.5 text-xs text-[#885029] disabled:opacity-50 dark:border-night-line dark:bg-night-panel dark:text-orange">Guide: {task}</button>)}
+            <button onClick={resetSandbox} className="ml-auto shrink-0 whitespace-nowrap px-2 py-1 text-xs text-muted dark:text-night-muted">Reset sandbox</button>
+          </div>
+        )}
+        {doc && !doc.sandbox && browserView === 'page' && <p className="border-b border-line px-3 py-2 text-xs text-muted dark:border-night-line dark:text-night-muted">{doc.saved ? `Original website HTML · saved ${doc.savedAt ? new Date(doc.savedAt).toLocaleDateString() : 'locally'} · scripts disabled` : 'External snapshot · links and text fields work; site scripts and form submissions are disabled'}</p>}
         {/* body */}
-        <div className="min-h-0 flex-1">
-          {browserView === 'empty' && <EmptyState pageError={pageError} onPick={(u) => void loadUrl(u)} onSearch={(q) => void search(q)} />}
+        <div data-pageguide-page className="min-h-0 flex-1">
+          {browserView === 'empty' && <LibraryShelf />}
           {browserView === 'loading' && (
-            <div className="flex h-full items-center justify-center text-[12px] text-muted">
-              <span className="animate-pulse">Loading {query}…</span>
+            <div role="status" className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-base text-muted">
+              <span className="pg-spinner" />
+              <span className="max-w-full break-all">Fetching {query}…</span>
+              <button onClick={showLibrary} className="rounded-full border border-orange-ring px-4 py-2 text-sm text-orange">Cancel and open library</button>
             </div>
           )}
           {browserView === 'results' && (
             <Results results={results || []} query={query} onOpen={(u) => void openResult(u)} />
           )}
-          {browserView === 'page' && doc && (
+          {browserView === 'page' && doc?.sandbox && <SandboxView doc={doc} />}
+          {browserView === 'page' && doc && !doc.sandbox && (
             <PageView
               doc={doc}
-              highlightId={highlightId}
+              evidence={evidence}
+              focusedEvidence={focusedEvidence}
               guideId={guideTarget}
               fieldValues={fieldValues}
               clicked={clicked}
@@ -106,52 +121,7 @@ export default function ExtensionSurface({ onOpenSettings }: { onOpenSettings: (
 
       {/* side panel column */}
       <div className="min-h-0">
-        <SidePanel onOpenSettings={onOpenSettings} />
-      </div>
-    </div>
-  );
-}
-
-function EmptyState({
-  pageError,
-  onPick,
-  onSearch,
-}: {
-  pageError: string | null;
-  onPick: (u: string) => void;
-  onSearch: (q: string) => void;
-}) {
-  const examples = [
-    { label: 'Wikipedia: Rayleigh scattering', url: 'https://en.wikipedia.org/wiki/Rayleigh_scattering' },
-    { label: 'MDN: fetch()', url: 'https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API' },
-  ];
-  return (
-    <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-      <div className="mb-3 text-4xl">🍊</div>
-      <h2 className="text-lg font-medium text-ink dark:text-night-ink">Open any page, then ask.</h2>
-      <p className="mt-1 max-w-sm text-[12px] leading-relaxed text-muted dark:text-night-muted">
-        Paste a URL or search the web in the bar above. PageGuide reads the page so Find can highlight the answer and
-        Guide can walk you through a task.
-      </p>
-      {pageError && (
-        <p className="mt-3 rounded-lg bg-[#fff2e9] px-3 py-2 text-[11px] text-[#9b6443] dark:bg-[#3a2a22]">{pageError}</p>
-      )}
-      <div className="mt-5 flex flex-wrap justify-center gap-2">
-        {examples.map((e) => (
-          <button
-            key={e.url}
-            onClick={() => onPick(e.url)}
-            className="rounded-full border border-line bg-white px-3 py-1.5 text-[11px] text-ink hover:border-orange/60 hover:bg-orange-soft/40 dark:border-night-line dark:bg-night-panel dark:text-night-ink"
-          >
-            {e.label}
-          </button>
-        ))}
-        <button
-          onClick={() => onSearch('best hiking trails near a lake')}
-          className="rounded-full border border-line bg-white px-3 py-1.5 text-[11px] text-ink hover:border-orange/60 hover:bg-orange-soft/40 dark:border-night-line dark:bg-night-panel dark:text-night-ink"
-        >
-          🔎 Try a web search
-        </button>
+        <SidePanel />
       </div>
     </div>
   );

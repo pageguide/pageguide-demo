@@ -1,17 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useStore } from '@/lib/store';
-import ModeSwitch from '@/components/ModeSwitch';
-import Settings from '@/components/Settings';
 import ExtensionSurface from '@/components/surfaces/ExtensionSurface';
-import TerminalSurface from '@/components/surfaces/TerminalSurface';
 
 export default function Home() {
   const hydrate = useStore((s) => s.hydrate);
   const loadConfig = useStore((s) => s.loadConfig);
-  const surface = useStore((s) => s.surface);
-  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     hydrate();
@@ -31,20 +26,12 @@ export default function Home() {
             Find &amp; Guide on any page
           </span>
         </div>
-        <div className="flex items-center gap-3">
-          <ModeSwitch />
-        </div>
       </header>
 
       <main className="min-h-0 flex-1 p-3 md:p-4">
-        {surface === 'browser' ? (
-          <ExtensionSurface onOpenSettings={() => setSettingsOpen(true)} />
-        ) : (
-          <TerminalSurface onOpenSettings={() => setSettingsOpen(true)} />
-        )}
+        <ExtensionSurface />
       </main>
 
-      {settingsOpen && <Settings onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 }

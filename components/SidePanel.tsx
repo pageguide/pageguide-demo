@@ -1,162 +1,127 @@
 'use client';
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { useStore, currentModel } from '@/lib/store';
-import { PROVIDERS, prettyModel } from '@/lib/providers';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import { useStore, type GuideRun } from '@/lib/store';
+import type { Evidence } from '@/lib/types';
 
-export default function SidePanel({ onOpenSettings }: { onOpenSettings: () => void }) {
+export default function SidePanel() {
   const {
     settings,
-    auto,
-    setAuto,
     doc,
     messages,
     busy,
-    guide,
     ask,
     loadUrl,
     search,
     clearChat,
     toggleDark,
-    guideNext,
-    reset,
-    saveChat,
-    history,
-    historyOpen,
-    toggleHistory,
-    loadChat,
-    deleteChat,
+    admin,
+    unlockAdmin,
+    lockAdmin,
+    guideRun,
+    scratchpad,
+    toggleJourney,
   } = useStore();
   const [input, setInput] = useState('');
-  const [autoOpen, setAutoOpen] = useState(false);
+  const [openEv, setOpenEv] = useState<string | null>(null);
+  const [adminNotice, setAdminNotice] = useState('');
   const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
-  }, [messages, guide]);
+  }, [messages, guideRun]);
 
-  const providerLabel = PROVIDERS[settings.provider].label;
-  const modelLabel = prettyModel(currentModel(settings));
+  const usages = messages.flatMap((m) => m.result?.usage ? [m.result.usage] : []);
+  const tokens = usages.reduce((sum, usage) => sum + usage.total, 0);
+  const cost = usages.reduce((sum, usage) => sum + (usage.cost ?? 0), 0);
+  const costUnknown = usages.some((usage) => usage.cost === null);
+  const estimated = usages.some((usage) => usage.estimated);
 
   const submit = () => {
     const t = input.trim();
-    if (!t) return;
+    if (!t || busy) return;
     setInput('');
+    // Keep admin access without adding another toolbar button or sending credentials to the model.
+    if (/^\/admin(?:\s|$)/i.test(t)) {
+      const password = t.replace(/^\/admin\s*/i, '');
+      if (password === 'off') {
+        lockAdmin();
+        setAdminNotice('Admin mode off.');
+      } else {
+        setAdminNotice(unlockAdmin(password) ? 'Admin mode on.' : 'Could not unlock admin mode.');
+      }
+      return;
+    }
+    setAdminNotice('');
     if (/^\/open\s+/i.test(t)) return void loadUrl(t);
     if (/^\/search\s+/i.test(t)) return void search(t);
     if (/^\/clear\b/i.test(t)) return clearChat();
     void ask(t);
   };
 
-  const guideActive = guide && guide.current < guide.steps.length;
-
   return (
-    <div className="relative flex h-full flex-col bg-white dark:bg-night-panel">
+    <section aria-label="PageGuide chat" className="pg-chat relative flex h-full min-w-0 flex-col overflow-hidden">
       {/* header */}
-      <div className="flex items-center justify-between border-b border-line px-4 py-3 dark:border-night-line">
-        <div className="flex items-center gap-2 text-[15px] font-semibold text-ink dark:text-night-ink">
-          <span>🍊</span> PageGuide
-        </div>
-        <div className="flex items-center gap-4">
+      <header className="flex shrink-0 items-center justify-between gap-3 px-5 py-4">
+        <div className="text-lg font-semibold tracking-tight text-ink dark:text-night-ink">PageGuide</div>
+        <div className="flex items-center gap-1">
           <IconBtn label={settings.dark ? 'Light mode' : 'Dark mode'} onClick={toggleDark}>
             {settings.dark ? '☀' : '☾'}
           </IconBtn>
-          <IconBtn label="Chat history" onClick={() => toggleHistory()}>
-            ⟲
-          </IconBtn>
-          <IconBtn label="New chat" onClick={reset}>
-            ✎
-          </IconBtn>
-          <IconBtn label="Save chat" onClick={saveChat}>
-            ⤓
-          </IconBtn>
-          <IconBtn label="Settings" onClick={onOpenSettings}>
-            ⚙
+          <IconBtn label="Clear chat" onClick={() => { clearChat(); setOpenEv(null); setAdminNotice(''); }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+              <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7M14 10v7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </IconBtn>
         </div>
-      </div>
-
-      {historyOpen && (
-        <HistoryPanel
-          history={history}
-          onLoad={loadChat}
-          onDelete={deleteChat}
-          onSave={saveChat}
-          onClose={() => toggleHistory(false)}
-        />
-      )}
-
-      {/* provider badge */}
-      <div className="flex justify-center px-4 pt-3">
-        <div className="rounded-full border border-sage-soft bg-sage-soft/60 px-3 py-1 text-[11px] text-sage dark:border-night-line dark:bg-night dark:text-[#a9bb95]">
-          🤖 Using <strong className="font-semibold text-ink dark:text-night-ink">{providerLabel}</strong> · {modelLabel}
-        </div>
-      </div>
+      </header>
 
       {/* conversation */}
-      <div ref={logRef} className="pg-scroll flex-1 space-y-3 overflow-y-auto px-4 py-4">
-        {messages.length === 0 && (
-          <div className="mt-6 text-center text-[12px] leading-relaxed text-muted dark:text-night-muted">
-            <p className="mb-2 text-[13px] font-medium text-ink dark:text-night-ink">Ask about the page.</p>
-            <p>
-              Open a URL or search in the address bar, then ask to <strong>Find</strong> the answer, or ask how to do
-              something to <strong>Guide</strong> you. Tip: start with <code>/find</code> or <code>/guide</code> to force
-              a mode.
+      <div ref={logRef} className={`pg-scroll min-h-0 flex-1 overflow-y-auto px-5 py-5 ${messages.length === 0 && !guideRun ? 'flex flex-col justify-center' : 'space-y-6'}`}>
+        {messages.length === 0 && !guideRun && (
+          <div className="pb-8 text-center">
+            <div aria-hidden="true" className="mx-auto mb-5 text-5xl">🍊</div>
+            <h1 className="text-[28px] font-medium leading-tight tracking-tight text-ink dark:text-night-ink">Your next move?</h1>
+            <p className="mx-auto mt-3 max-w-[260px] text-base leading-relaxed text-muted dark:text-night-muted">
+              {doc ? 'Ask about this page, or let me guide you through a task.' : 'Open a page. Find an answer. Get things done.'}
             </p>
           </div>
         )}
         {messages.map((m) => (
           <Message key={m.id} m={m} />
         ))}
-        {guideActive && (
-          <div className="rounded-lg border border-orange-ring bg-orange-soft/60 px-3 py-2.5 text-[11px] dark:border-night-line dark:bg-[#3a2c1f]">
-            <div className="mb-1 flex items-center gap-2 font-semibold text-[#8c5a2b] dark:text-orange">
-              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-orange text-[9px] text-white">
-                {guide!.current + 1}
-              </span>
-              Step {guide!.current + 1} of {guide!.steps.length}
-            </div>
-            <p className="text-[#7a5a34] dark:text-[#e2c4a2]">{guide!.steps[guide!.current].instruction}</p>
-            <p className="mt-1 text-[10px] text-muted dark:text-night-muted">
-              {auto === 'noask'
-                ? 'PageGuide is performing this step…'
-                : 'Click the outlined control, or press “Do this step”.'}
-            </p>
-            {auto === 'ask' && (
-              <button
-                onClick={guideNext}
-                className="mt-2 rounded-md border border-sage/40 bg-sage-soft px-2.5 py-1 text-[10px] font-medium text-sage"
-              >
-                ▶ Do this step
-              </button>
-            )}
+        {guideRun && (
+          <GuideCard
+            run={guideRun}
+            scratchpad={scratchpad}
+            openEv={openEv}
+            setOpenEv={setOpenEv}
+            onToggleJourney={toggleJourney}
+          />
+        )}
+        {busy && !guideRun && (
+          <div role="status" className="flex items-center gap-2 text-base text-muted dark:text-night-muted">
+            <span className="pg-spinner" /> Thinking…
           </div>
         )}
-        {busy && <div className="animate-pulse text-[11px] text-muted dark:text-night-muted">Reading the page…</div>}
       </div>
 
-      {/* context chip */}
+      {/* Read-only page context, tucked above the composer. */}
       {doc && (
-        <div className="px-3 pb-1">
-          <div className="flex items-center justify-between gap-2 rounded-lg border border-orange-ring bg-orange-soft/50 px-3 py-2 text-[11px] dark:border-night-line dark:bg-night">
-            <span className="flex items-center gap-2 truncate text-ink dark:text-night-ink">
-              {doc.favicon && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={doc.favicon} alt="" width={14} height={14} />
-              )}
-              Working on <strong className="truncate font-semibold">“{doc.title}”</strong>
-            </span>
-            <button onClick={reset} className="text-muted hover:text-ink dark:text-night-muted" aria-label="Clear page">
-              ✕
-            </button>
+        <div className="shrink-0 px-4 pb-2">
+          <div title={doc.title} className="flex min-w-0 items-center gap-2 rounded-full border border-white/70 bg-white/50 px-4 py-2.5 text-sm text-ink dark:border-white/10 dark:bg-white/5 dark:text-night-ink">
+            <span aria-hidden="true">◎</span>
+            <span className="truncate">{doc.title}</span>
           </div>
         </div>
       )}
 
       {/* composer */}
-      <div className="border-t border-line px-3 py-3 dark:border-night-line">
-        <div className="rounded-xl border border-line bg-cream px-3 py-2 dark:border-night-line dark:bg-night">
+      <div className="shrink-0 px-3 pb-3 pt-1">
+        <div className="pg-chat-composer rounded-[28px] border border-white/80 bg-white/90 px-5 pb-3 pt-4 shadow-soft dark:border-white/10 dark:bg-[#29221f]/95">
           <textarea
+            suppressHydrationWarning
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -165,74 +130,261 @@ export default function SidePanel({ onOpenSettings }: { onOpenSettings: () => vo
                 submit();
               }
             }}
-            rows={4}
-            placeholder="Ask anything… (type / for commands)"
-            className="composer-input min-h-[88px] w-full resize-none overflow-y-auto bg-transparent text-[13px] leading-6 text-ink outline-none placeholder:text-muted dark:text-night-ink dark:placeholder:text-night-muted"
+            rows={3}
+            aria-label="Message PageGuide"
+            placeholder="Ask PageGuide…"
+            className="composer-input min-h-[84px] w-full resize-none overflow-y-auto bg-transparent text-base leading-7 text-ink outline-none placeholder:text-muted dark:text-night-ink dark:placeholder:text-night-muted"
           />
-          <div className="mt-1 flex items-center gap-2">
-            <button title="Attach (coming soon)" className="text-muted hover:text-ink dark:text-night-muted">
-              📎
-            </button>
-            <button
-              onClick={clearChat}
-              className="flex items-center gap-1 text-[11px] text-muted hover:text-ink dark:text-night-muted"
-            >
-              ✎ Clear
-            </button>
-            <div className="relative">
-              <button
-                onClick={() => setAutoOpen((v) => !v)}
-                className="flex items-center gap-1 rounded-full border border-orange-ring px-2.5 py-1 text-[11px] font-medium text-[#8c5a2b] dark:border-night-line dark:text-orange"
-              >
-                ⚡ Auto: {auto === 'noask' ? 'No Ask' : 'Ask'} ▾
-              </button>
-              {autoOpen && (
-                <div className="absolute bottom-8 left-0 z-10 w-44 rounded-lg border border-line bg-white p-1 text-[11px] shadow-panel dark:border-night-line dark:bg-night-panel">
-                  {(['noask', 'ask'] as const).map((a) => (
-                    <button
-                      key={a}
-                      onClick={() => {
-                        setAuto(a);
-                        setAutoOpen(false);
-                      }}
-                      className="block w-full rounded px-2 py-1.5 text-left hover:bg-cream dark:hover:bg-night"
-                    >
-                      {a === 'noask' ? 'No Ask — agent performs steps' : 'Ask — confirm each step'}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+          <div className="mt-1 flex items-center justify-end">
             <button
               onClick={submit}
-              disabled={busy}
+              disabled={busy || !input.trim()}
               title="Send"
-              className="ml-auto flex h-9 w-9 items-center justify-center rounded-full bg-orange text-white disabled:opacity-50"
+              className="pg-chat-send flex h-11 w-11 items-center justify-center rounded-full text-white transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange disabled:cursor-not-allowed disabled:opacity-40"
               aria-label="Send"
             >
-              ➤
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <path d="M12 19V5m-6 6 6-6 6 6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </button>
           </div>
         </div>
-        <p className="mt-2 text-center text-[10px] text-muted dark:text-night-muted">
-          PageGuide can make mistakes ⓘ
-          {(() => {
-            const total = messages.reduce((a, m) => a + (m.result?.usage?.cost || 0), 0);
-            return total > 0 ? ` · session ${total < 0.01 ? `$${total.toFixed(5)}` : `$${total.toFixed(4)}`}` : '';
-          })()}
-        </p>
+        {adminNotice && <p role="status" className="mt-2 text-center text-sm text-muted dark:text-night-muted">{adminNotice}</p>}
+        {admin && (
+          <p data-testid="admin-usage" className="mt-2 text-center text-xs tabular-nums text-muted dark:text-night-muted">
+            {tokens.toLocaleString()} tokens · {estimated ? '≈ ' : ''}${cost.toFixed(5)}{costUnknown ? ' + unpriced usage' : ''}
+            <span className="block">Recorded usage · Guide usage not available</span>
+          </p>
+        )}
+        <p className="mt-2 text-center text-xs text-muted dark:text-night-muted">PageGuide can make mistakes. Check important details.</p>
+      </div>
+    </section>
+  );
+}
+
+function GuideCard({
+  run,
+  scratchpad,
+  openEv,
+  setOpenEv,
+  onToggleJourney,
+}: {
+  run: GuideRun;
+  scratchpad: Evidence[];
+  openEv: string | null;
+  setOpenEv: (n: string | null) => void;
+  onToggleJourney: () => void;
+}) {
+  const [openStep, setOpenStep] = useState<number | null>(null);
+  const stepEvidence = (i: number): Evidence => ({ name: `journey-step-${i}`, label: i === 0 ? 'Initial state' : `Step ${i}`, index: i, imageUrl: run.journey[i].screenshot!, caption: run.journey[i].instruction, capturedAt: run.journey[i].capturedAt });
+  const dot = (s: string) =>
+    s === 'done' ? 'bg-sage' : s === 'failed' ? 'bg-red-500' : s === 'running' ? 'bg-orange animate-pulse' : 'bg-line dark:bg-night-line';
+  const statusPill =
+    run.final?.status === 'Completed'
+      ? 'border-sage text-sage'
+      : run.final?.status === 'Failed'
+        ? 'border-[#c08457] text-[#9b6443]'
+        : 'border-line text-muted';
+  const current = run.journey.find((j) => j.status === 'running');
+
+  return (
+    <div className="space-y-2">
+      {/* task card */}
+      <div className="rounded-xl border border-line bg-white px-3 py-2.5 shadow-soft dark:border-night-line dark:bg-night-panel">
+        <div className="flex items-start justify-between gap-2">
+          <div className="text-base font-semibold text-ink dark:text-night-ink">{run.task}</div>
+
+        </div>
+        <button aria-label="View Journey" aria-expanded={run.journeyOpen} onClick={onToggleJourney} className="mt-2 flex min-h-10 items-center gap-1 text-sm font-medium text-muted dark:text-night-muted">
+          <span className={`transition-transform ${run.journeyOpen ? 'rotate-90' : ''}`}>▸</span> View Journey
+        </button>
+        {run.journeyOpen && (
+          <div className="mt-2 space-y-2 border-t border-line pt-2 dark:border-night-line">
+            {run.journey.map((j, i) => (
+              <div key={i} className="text-sm leading-relaxed">
+                {j.screenshot ? (
+                  <EvidenceBadge ev={stepEvidence(i)} ariaLabel={`View step ${i}: ${j.instruction}`} onOpen={() => setOpenStep(i)}>
+                    <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${dot(j.status)}`} />
+                    <span><span className="text-xs text-muted dark:text-night-muted">{i === 0 ? 'Initial state' : `Step ${i}`} · </span>{j.instruction}<span aria-hidden="true" className="ml-1 text-orange">▧</span></span>
+                  </EvidenceBadge>
+                ) : <div className="flex items-start gap-2"><span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${dot(j.status)}`} /><span>{j.instruction}{j.screenshotError && <span className="block text-xs text-muted">{j.screenshotError}</span>}</span></div>}
+              </div>
+            ))}
+          </div>
+        )}
+        {run.running && current && (
+          <div className="mt-2 flex items-center gap-2 border-t border-line pt-2 text-[11px] text-[#8c5a2b] dark:border-night-line dark:text-orange">
+            <span className="pg-spinner" /> {current.instruction}
+          </div>
+        )}
+      </div>
+
+      {/* answer card */}
+      {run.final && (
+        <div className="rounded-xl border border-orange-ring bg-white px-3 py-2.5 dark:border-night-line dark:bg-night-panel">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wide text-orange">Answer</span>
+            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusPill}`}>
+              {run.final.status}
+            </span>
+          </div>
+          <p className="mt-2 text-base leading-7 text-ink dark:text-night-ink">
+            {renderAnswerWithEvidence(run.final.answer, scratchpad, setOpenEv)}
+          </p>
+          {run.final.verification && <p data-testid="verification-result" className="mt-3 rounded-lg bg-orange-soft/50 px-3 py-2 text-xs leading-relaxed text-[#885532] dark:bg-white/5 dark:text-orange">
+            {run.final.verification.completed ? 'Verified' : run.final.verification.source === 'unavailable' ? 'Verification unavailable' : 'Not complete'} · {run.final.verification.reason}
+          </p>}
+          {scratchpad.length > 0 && (
+            <section aria-label="Saved evidence" className="mt-4 border-t border-orange-ring pt-3 dark:border-night-line">
+              <p className="mb-2 text-sm font-semibold text-ink dark:text-night-ink">Saved evidence ({scratchpad.length})</p>
+              <div className="grid grid-cols-2 gap-2">
+                {scratchpad.map((ev) => <div key={ev.name} className="min-w-0 rounded-xl border border-line bg-cream p-2 dark:border-night-line dark:bg-night">
+                  <button onClick={() => setOpenEv(ev.name)} aria-label={`Enlarge screenshot ${ev.index}`} className="block w-full overflow-hidden rounded-lg bg-white">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={ev.imageUrl} alt={`Screenshot ${ev.index}: ${ev.caption || 'Captured page'}`} className="h-28 w-full object-contain" />
+                  </button>
+                  <div className="mt-1 flex flex-wrap items-center gap-1">
+                    <EvidenceBadge ev={ev} onOpen={() => setOpenEv(ev.name)} />
+                    <span className="min-w-0 text-xs font-medium text-ink dark:text-night-ink">{ev.label || ev.caption}</span>
+                    {ev.step !== undefined && <span className="w-full px-1 text-xs text-muted dark:text-night-muted">Saved at step {ev.step}</span>}
+                  </div>
+                </div>)}
+              </div>
+            </section>
+          )}
+
+        </div>
+      )}
+
+      {openEv && <EvidenceViewer ev={scratchpad.find((e) => e.name === openEv)} onClose={() => setOpenEv(null)} />}
+      {openStep !== null && <EvidenceViewer ev={stepEvidence(openStep)} onClose={() => setOpenStep(null)} />}
+    </div>
+  );
+}
+
+function renderAnswerWithEvidence(answer: string, scratchpad: Evidence[], setOpenEv: (n: string | null) => void) {
+  const parts: ReactNode[] = [];
+  const re = /\[EV:([a-z0-9-]+)\]/gi;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let k = 0;
+  while ((m = re.exec(answer))) {
+    if (m.index > last) parts.push(answer.slice(last, m.index));
+    const ev = scratchpad.find((e) => e.name === m![1].toLowerCase());
+    if (ev) {
+      parts.push(
+        <EvidenceBadge key={`ev${k++}`} ev={ev} onOpen={() => setOpenEv(ev.name)} />,
+      );
+    } else {
+      parts.push(m[0]);
+    }
+    last = re.lastIndex;
+  }
+  if (last < answer.length) parts.push(answer.slice(last));
+  return parts;
+}
+
+function EvidenceBadge({ ev, onOpen, children, ariaLabel }: { ev: Evidence; onOpen: () => void; children?: ReactNode; ariaLabel?: string }) {
+  const previewId = useId();
+  const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const timer = useRef<ReturnType<typeof setTimeout>>();
+  const keepOpen = () => clearTimeout(timer.current);
+  const hide = () => { timer.current = setTimeout(() => setPosition(null), 180); };
+  const show = () => {
+    keepOpen();
+    const rect = button.current!.getBoundingClientRect();
+    window.dispatchEvent(new CustomEvent('pageguide-preview', { detail: previewId }));
+    // Put the preview beside the panel on wide screens, never over other step controls.
+    const beside = rect.left >= 340;
+    const top = beside ? rect.top - 100 : rect.top >= 330 ? rect.top - 320 : rect.bottom + 10;
+    setPosition({ left: beside ? rect.left - 336 : Math.max(8, Math.min(rect.left, window.innerWidth - 336)), top: Math.max(8, Math.min(top, window.innerHeight - 320)) });
+  };
+  useEffect(() => {
+    const exclusive = (event: Event) => { if ((event as CustomEvent).detail !== previewId) setPosition(null); };
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') setPosition(null); };
+    window.addEventListener('pageguide-preview', exclusive);
+    window.addEventListener('keydown', escape);
+    return () => { clearTimeout(timer.current); window.removeEventListener('pageguide-preview', exclusive); window.removeEventListener('keydown', escape); };
+  }, [previewId]);
+  return (
+    <>
+      <button ref={button} aria-label={ariaLabel || `Screenshot evidence ${ev.index}`} aria-describedby={position ? previewId : undefined}
+        onClick={() => { setPosition(null); onOpen(); }} onMouseEnter={show} onMouseLeave={hide} onFocus={show} onBlur={hide}
+        onKeyDown={(e) => { if (e.key === 'Escape') setPosition(null); }}
+        className={children ? 'flex w-full items-start gap-2 rounded-lg px-1 py-1 text-left text-sm text-ink hover:bg-orange-soft/40 dark:text-night-ink' : 'mx-1 inline-flex min-h-8 items-center gap-1 rounded-lg bg-orange-soft px-2 py-1 align-baseline text-sm font-semibold text-[#8c5a2b] hover:bg-orange/20'}>
+        {children || <>📷 {ev.index}</>}
+      </button>
+      {position && createPortal(
+        <div role="tooltip" id={previewId} onMouseEnter={keepOpen} onMouseLeave={hide}
+          className="fixed z-[60] w-80 max-w-[calc(100vw-1rem)] rounded-2xl border border-orange-ring bg-white p-3 text-ink shadow-panel dark:border-night-line dark:bg-night-panel dark:text-night-ink"
+          style={position}>
+          <p className="mb-2 text-sm font-semibold">{ev.label || ev.caption || 'Saved screenshot'}</p>
+          <EvidenceImage ev={ev} compact />
+          {children && <p className="mt-2 text-xs">{ev.caption}</p>}
+          <p className="mt-2 text-xs text-muted dark:text-night-muted">Click the badge to enlarge.</p>
+        </div>, document.body,
+      )}
+    </>
+  );
+}
+
+function EvidenceImage({ ev, compact = false }: { ev: Evidence; compact?: boolean }) {
+  const b = ev.box;
+  return <div className={`overflow-auto rounded-lg border border-line ${compact ? 'max-h-56' : 'max-h-[75vh]'}`}>
+    <div className="relative">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={ev.imageUrl} alt={ev.caption || ev.name} className="block h-auto w-full" />
+      {b && <span className="pointer-events-none absolute rounded-sm border-2 border-orange bg-orange/10" style={{ left: `${b[0] * 100}%`, top: `${b[1] * 100}%`, width: `${b[2] * 100}%`, height: `${b[3] * 100}%` }}>
+        {ev.annotation && <span className="absolute left-0 top-full mt-1 whitespace-nowrap rounded bg-orange px-2 py-1 text-xs text-white">{ev.annotation}</span>}
+      </span>}
+    </div>
+  </div>;
+}
+
+function EvidenceViewer({ ev, onClose }: { ev: Evidence | undefined; onClose: () => void }) {
+  if (!ev) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div
+        role="dialog" aria-label="Saved screenshot" aria-modal="true" tabIndex={-1}
+        onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
+        className="w-full max-w-4xl rounded-2xl border border-line bg-white p-3 shadow-panel dark:border-night-line dark:bg-night-panel"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-sm font-semibold text-[#8c5a2b]">📷 {ev.label || ev.name.replace(/-/g, ' ')}{ev.step !== undefined ? ` · Step ${ev.step}` : ''}</span>
+          <button aria-label="Close screenshot" autoFocus onClick={onClose} className="flex h-10 w-10 items-center justify-center text-muted hover:text-ink dark:text-night-muted">
+            ✕
+          </button>
+        </div>
+        <EvidenceImage ev={ev} />
+        {ev.caption && <p className="mt-2 text-[11px] text-muted dark:text-night-muted">{ev.caption}</p>}
       </div>
     </div>
   );
 }
 
-function IconBtn({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
+function IconBtn({
+  label,
+  onClick,
+  children,
+  active,
+}: {
+  label: string;
+  onClick: () => void;
+  children: ReactNode;
+  active?: boolean;
+}) {
   return (
     <div className="group relative flex items-center">
       <button
         onClick={onClick}
         aria-label={label}
-        className="text-[20px] leading-none text-muted transition-colors hover:text-ink dark:text-night-muted dark:hover:text-night-ink"
+        title={label}
+        className={`flex h-11 w-11 items-center justify-center rounded-full text-[23px] leading-none transition-colors hover:bg-orange/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange ${
+          active ? 'text-orange' : 'text-muted hover:text-ink dark:text-night-muted dark:hover:text-night-ink'
+        }`}
       >
         {children}
       </button>
@@ -243,93 +395,6 @@ function IconBtn({ label, onClick, children }: { label: string; onClick: () => v
   );
 }
 
-function HistoryPanel({
-  history,
-  onLoad,
-  onDelete,
-  onSave,
-  onClose,
-}: {
-  history: { id: string; title: string; savedAt: number; url: string | null }[];
-  onLoad: (id: string) => void;
-  onDelete: (id: string) => void;
-  onSave: () => void;
-  onClose: () => void;
-}) {
-  return (
-    <div className="absolute inset-x-0 top-[49px] z-20 mx-3 max-h-[70%] overflow-auto rounded-xl border border-line bg-white p-2 shadow-panel dark:border-night-line dark:bg-night-panel">
-      <div className="flex items-center justify-between px-1 pb-2">
-        <span className="text-[12px] font-semibold text-ink dark:text-night-ink">Saved chats</span>
-        <div className="flex items-center gap-2">
-          <button onClick={onSave} className="rounded-md bg-orange px-2 py-1 text-[10px] font-medium text-white">
-            ⤓ Save current
-          </button>
-          <button onClick={onClose} className="text-muted hover:text-ink dark:text-night-muted">
-            ✕
-          </button>
-        </div>
-      </div>
-      {history.length === 0 && (
-        <p className="px-2 py-3 text-center text-[11px] text-muted dark:text-night-muted">
-          No saved chats yet. Press “Save current” to keep this one.
-        </p>
-      )}
-      {history.map((c) => (
-        <div
-          key={c.id}
-          className="flex items-center justify-between gap-2 rounded-lg px-2 py-2 hover:bg-cream dark:hover:bg-night"
-        >
-          <button onClick={() => onLoad(c.id)} className="min-w-0 flex-1 text-left">
-            <div className="truncate text-[12px] text-ink dark:text-night-ink">{c.title}</div>
-            <div className="truncate text-[10px] text-muted dark:text-night-muted">
-              {new Date(c.savedAt).toLocaleString()} {c.url ? `· ${safeHost(c.url)}` : ''}
-            </div>
-          </button>
-          <button
-            onClick={() => onDelete(c.id)}
-            className="text-[11px] text-muted hover:text-[#9b6443]"
-            aria-label="Delete"
-          >
-            🗑
-          </button>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function UsageLine({
-  usage,
-}: {
-  usage: { prompt: number; completion: number; total: number; cost: number | null; estimated: boolean };
-}) {
-  const cost =
-    usage.cost == null
-      ? null
-      : usage.cost < 0.01
-        ? `$${usage.cost.toFixed(5)}`
-        : `$${usage.cost.toFixed(4)}`;
-  return (
-    <div className="mt-1 font-mono text-[9.5px] text-muted dark:text-night-muted">
-      {usage.total.toLocaleString()} tokens ({usage.prompt.toLocaleString()} in / {usage.completion.toLocaleString()} out)
-      {cost && (
-        <>
-          {' · '}
-          <span className="text-sage">{cost}</span> {usage.estimated ? '(est.)' : '(reported)'}
-        </>
-      )}
-    </div>
-  );
-}
-
-function safeHost(u: string): string {
-  try {
-    return new URL(u).hostname;
-  } catch {
-    return u;
-  }
-}
-
 function Message({
   m,
 }: {
@@ -337,13 +402,13 @@ function Message({
 }) {
   if (m.role === 'user') {
     return (
-      <div className="ml-6 rounded-xl rounded-br-sm bg-sage-soft px-3 py-2 text-[12px] text-[#4e5945] dark:bg-night dark:text-night-ink">
+      <div className="ml-6 whitespace-pre-wrap break-words rounded-3xl rounded-br-md bg-white/75 px-4 py-3 text-base leading-7 text-ink dark:bg-white/10 dark:text-night-ink">
         {m.text}
       </div>
     );
   }
   if (m.role === 'system') {
-    return <div className="text-center text-[10.5px] italic text-muted dark:text-night-muted">{m.text}</div>;
+    return <div className="text-center text-sm leading-relaxed text-muted dark:text-night-muted">{m.text}</div>;
   }
   if (m.action) {
     return <div className="font-mono text-[11px] text-sage">{m.text}</div>;
@@ -352,17 +417,17 @@ function Message({
   const citations = isFind ? m.result.citations || [] : [];
   const visual = isFind ? m.result.visual : null;
   return (
-    <div className={`text-[12px] leading-relaxed ${m.error ? 'text-[#9b6443]' : 'text-[#5a6350] dark:text-[#c3c8ba]'}`}>
+    <div className={`break-words text-base leading-7 ${m.error ? 'text-[#9b6443]' : 'text-ink dark:text-night-ink'}`}>
       {!m.error && (
-        <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold text-ink dark:text-night-ink">
+        <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-ink dark:text-night-ink">
           <span>🍊</span> PageGuide
         </div>
       )}
-      <p className={m.error ? 'rounded-lg bg-[#fff2e9] px-3 py-2 dark:bg-[#3a2a22]' : ''}>
+      <p className={`whitespace-pre-wrap ${m.error ? 'rounded-lg bg-[#fff2e9] px-3 py-2 dark:bg-[#3a2a22]' : ''}`}>
         {isFind ? renderAnswer(m.text, citations, visual) : m.text}
       </p>
       {visual && <VisualEvidence v={visual} />}
-      {m.result?.usage && <UsageLine usage={m.result.usage} />}
+
     </div>
   );
 }
@@ -386,7 +451,7 @@ function renderAnswer(
       parts.push(
         <button
           key={`c${k++}`}
-          onClick={() => useStore.setState({ highlightId: cite.id })}
+          onClick={() => useStore.getState().focusEvidence(cite.id)}
           title="Show source on the page"
           className="align-super text-[9px] font-semibold text-[#6366f1] hover:underline dark:text-[#a5a1f5]"
         >
@@ -397,7 +462,7 @@ function renderAnswer(
       parts.push(
         <button
           key={`v${k++}`}
-          onClick={() => useStore.setState({ highlightId: visual.id })}
+          onClick={() => useStore.getState().focusEvidence(visual.id)}
           title="Show the image on the page"
           className="align-super text-[9px] font-semibold text-[#b7791f] hover:underline"
         >
@@ -425,7 +490,7 @@ function VisualEvidence({
         📎 Visual evidence [{v.marker}]
       </div>
       <button
-        onClick={() => useStore.setState({ highlightId: v.id })}
+        onClick={() => useStore.getState().focusEvidence(v.id)}
         className="relative block w-full overflow-hidden rounded-md"
         title="Show this image on the page"
       >
