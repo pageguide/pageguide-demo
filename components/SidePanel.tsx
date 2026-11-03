@@ -147,7 +147,11 @@ export default function SidePanel({ onOpenSettings }: { onOpenSettings: () => vo
             )}
           </div>
         )}
-        {busy && <div className="animate-pulse text-[11px] text-muted dark:text-night-muted">Reading the page…</div>}
+        {busy && (
+          <div className="flex items-center gap-2 text-[11px] text-muted dark:text-night-muted">
+            <span className="pg-spinner" /> Thinking…
+          </div>
+        )}
       </div>
 
       {/* context chip */}

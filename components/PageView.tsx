@@ -3,19 +3,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Block, PageDoc } from '@/lib/types';
 
-type Evidence = { id: string; quote?: string };
+type Evidence = { id: string; quote?: string; marker?: string };
 
 const HILITE_CSS = `
 [data-pg-ev], mark[data-pg-ev]{background:#fff2b8 !important;color:#5b531f !important;box-shadow:0 0 0 2px #e9cf86;border-radius:3px}
 [data-pg-focus], mark[data-pg-focus]{background:#ffcf7a !important;color:#4a3b16 !important;box-shadow:0 0 0 3px #f0792b !important;border-radius:4px}
 [data-pg-gd]{box-shadow:0 0 0 3px #f0792b !important;background:#fff6ee !important;border-radius:6px;scroll-margin:100px}
 mark[data-pg-ev],mark[data-pg-focus]{padding:0 1px}
+sup[data-pg-badge]{background:#f0792b;color:#fff;border-radius:5px;padding:0 4px;font-size:9px;font-weight:700;margin:0 2px;vertical-align:super;cursor:pointer;line-height:1.4;font-family:ui-sans-serif,system-ui,sans-serif;text-decoration:none}
+sup[data-pg-badge][data-focused]{box-shadow:0 0 0 2px #7a3e12}
 html{scroll-behavior:smooth}
 `;
 
 // Wrap the exact `quote` (whitespace-tolerant) inside `el` in <mark>s — even when
-// it spans inline elements (e.g. links). Returns false if not found (caller marks the block).
-function markSpan(el: Element, quote: string, focused: boolean): boolean {
+// it spans inline elements (e.g. links). Returns the last <mark> created, or null
+// if the quote wasn't found (caller then marks the whole block).
+function markSpan(el: Element, quote: string, focused: boolean): Element | null {
   const d = el.ownerDocument;
   const walker = d.createTreeWalker(el, NodeFilter.SHOW_TEXT);
   const nodes: { node: Text; start: number; len: number }[] = [];
@@ -30,15 +33,15 @@ function markSpan(el: Element, quote: string, focused: boolean): boolean {
     .trim()
     .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     .replace(/\s+/g, '\\s+');
-  if (!pattern) return false;
+  if (!pattern) return null;
   const m = new RegExp(pattern, 'i').exec(full);
-  if (!m) return false;
+  if (!m) return null;
   const s = m.index;
   const e = m.index + m[0].length;
   const attr = focused ? 'data-pg-focus' : 'data-pg-ev';
   // wrap each overlapping text-node segment, back-to-front so offsets stay valid
   const overlaps = nodes.filter((nd) => nd.start < e && nd.start + nd.len > s);
-  let wrapped = false;
+  let lastMark: Element | null = null;
   for (let i = overlaps.length - 1; i >= 0; i--) {
     const nd = overlaps[i];
     const a = Math.max(0, s - nd.start);
@@ -52,12 +55,12 @@ function markSpan(el: Element, quote: string, focused: boolean): boolean {
       mark.setAttribute(attr, '');
       mark.setAttribute('data-pg-mark', '');
       range.surroundContents(mark);
-      wrapped = true;
+      if (!lastMark) lastMark = mark; // back-to-front: first wrapped is the last in document order
     } catch {
       /* skip this segment */
     }
   }
-  return wrapped;
+  return lastMark;
 }
 
 export default function PageView({
@@ -117,7 +120,8 @@ export default function PageView({
   useEffect(() => {
     const d = idoc();
     if (!d) return;
-    // clear previous marks + attributes
+    // clear previous badges, marks + attributes
+    d.querySelectorAll('sup[data-pg-badge]').forEach((s) => s.remove());
     d.querySelectorAll('mark[data-pg-mark]').forEach((m) => {
       const parent = m.parentNode;
       if (!parent) return;
@@ -143,9 +147,18 @@ export default function PageView({
       const el = d.querySelector(`[data-pg-id="${ev.id}"]`);
       if (!el) continue;
       const focused = ev.id === focusedEvidence;
-      const spanned = ev.quote ? markSpan(el, ev.quote, focused) : false;
-      if (!spanned) el.setAttribute(focused ? 'data-pg-focus' : 'data-pg-ev', '');
-      if (focused) focusEl = el.querySelector('mark[data-pg-focus]') || el;
+      const lastMark = ev.quote ? markSpan(el, ev.quote, focused) : null;
+      if (!lastMark) el.setAttribute(focused ? 'data-pg-focus' : 'data-pg-ev', '');
+      // PageGuide annotation badge (the citation marker) on the page
+      if (ev.marker) {
+        const badge = d.createElement('sup');
+        badge.setAttribute('data-pg-badge', '');
+        if (focused) badge.setAttribute('data-focused', '');
+        badge.textContent = ev.marker;
+        if (lastMark) lastMark.after(badge);
+        else el.appendChild(badge);
+      }
+      if (focused) focusEl = lastMark || el;
     }
     if (focusEl) focusEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [evidence, focusedEvidence, guideId, ready]);

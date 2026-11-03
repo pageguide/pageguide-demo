@@ -73,6 +73,26 @@ body {
   background: #40463a;
 }
 
+/* Thinking spinner */
+.pg-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #e7ddc9;
+  border-top-color: theme('colors.orange.DEFAULT');
+  border-radius: 50%;
+  animation: pg-spin 0.7s linear infinite;
+}
+.dark .pg-spinner {
+  border-color: #3a4034;
+  border-top-color: theme('colors.orange.DEFAULT');
+}
+@keyframes pg-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Chat composer: no scrollbars (the stray horizontal bar), just a clean box */
 .composer-input {
   scrollbar-width: none;

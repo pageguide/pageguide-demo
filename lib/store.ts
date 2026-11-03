@@ -56,7 +56,7 @@ interface StoreState {
 
   messages: ChatMessage[];
   busy: boolean;
-  evidence: { id: string; quote?: string }[]; // all cited spans of the current answer (persist)
+  evidence: { id: string; quote?: string; marker?: string }[]; // all cited spans of the current answer (persist)
   focusedEvidence: string | null; // the one the user clicked (shown stronger)
   guide: GuideState | null;
   fieldValues: Record<string, string>;
@@ -387,8 +387,8 @@ export const useStore = create<StoreState>((set, get) => ({
       if (result.kind === 'find') {
         // Highlight ALL cited passages (persist); focus/scroll to the first.
         const evidence = [
-          ...result.citations.map((c) => ({ id: c.id, quote: c.quote })),
-          ...(result.visual ? [{ id: result.visual.id }] : []),
+          ...result.citations.map((c) => ({ id: c.id, quote: c.quote, marker: c.marker })),
+          ...(result.visual ? [{ id: result.visual.id, marker: result.visual.marker }] : []),
         ];
         set({
           evidence,
