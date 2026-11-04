@@ -3,7 +3,7 @@
 import { create } from 'zustand';
 import { PROVIDERS } from './providers';
 import { LOCAL_LIBRARY, snapshotId, parseLibrary, type Library } from './library';
-import { sandboxSite, sandboxDoc, initialSandbox, routeSandbox, applySandboxAction, verifySandboxTask, type SandboxSite, type SandboxState, type BrowserAction } from './sandboxes';
+import { sandboxSite, sandboxDoc, initialSandbox, routeSandbox, applySandboxAction, verifySandboxTask, actionRisk, type SandboxSite, type SandboxState, type BrowserAction } from './sandboxes';
 import { cachedPage, cachePage } from './page-cache';
 import { loadSavedPage } from './saved-client';
 import type { VerificationResult } from './verification';
@@ -81,10 +81,11 @@ interface StoreState {
 
   messages: ChatMessage[];
   busy: boolean;
-  evidence: { id: string; quote?: string; marker?: string; annotation?: string }[]; // all cited spans of the current answer (persist)
+  evidence: { id: string; quote?: string; emphasis?: string; marker?: string; annotation?: string }[]; // all cited spans of the current answer (persist)
   focusedEvidence: string | null; // the one the user clicked (shown stronger)
   guide: GuideState | null;
   guideRun: GuideRun | null; // the autonomous Guide run (task card + journey + answer)
+  pendingConfirm: { kind: string; label: string; title: string; detail: string; instruction: string } | null; // an irreversible action awaiting user approval
   scratchpad: Evidence[]; // named evidence saved during the run
   fieldValues: Record<string, string>;
   clicked: string[];
@@ -125,6 +126,7 @@ interface StoreState {
   toggleJourney: () => void;
   toggleReasoning: () => void;
   closeGuideRun: () => void;
+  resolveConfirm: (ok: boolean) => void;
 
   saveChat: () => void;
   loadChat: (id: string) => void;
@@ -144,6 +146,7 @@ let runId = 0;
 let navigationId = 0;
 let navigationAbort: AbortController | null = null;
 let agentAbort: AbortController | null = null;
+let confirmResolver: ((ok: boolean) => void) | null = null;
 
 function defaultSettings(): Settings {
   return {
@@ -232,6 +235,7 @@ export const useStore = create<StoreState>((set, get) => ({
   focusedEvidence: null,
   guide: null,
   guideRun: null,
+  pendingConfirm: null,
   scratchpad: [],
   fieldValues: {},
   clicked: [],
@@ -439,6 +443,8 @@ export const useStore = create<StoreState>((set, get) => ({
     const selection = get().selection?.url === doc?.url ? get().selection : null;
 
     set({ messages: [...get().messages, { id: msgId++, role: 'user', text: cleanQ, mode, ...(selection ? { selection } : {}) }] });
+    // Clear the "Selected text" chip once the selection has been captured onto the sent message.
+    if (get().selection) set({ selection: null });
 
     // Greetings / small talk: answer locally, don't ground or spend tokens.
     if (/^(hi|hello|hey|yo|sup|hiya|howdy|thanks|thank you|ty|ok|okay|cool|nice|test|ping)[\s!.?]*$/i.test(cleanQ)) {
@@ -520,7 +526,7 @@ export const useStore = create<StoreState>((set, get) => ({
       if (result.kind === 'find') {
         // Highlight ALL cited passages (persist); focus/scroll to the first.
         const evidence = [
-          ...result.citations.map((c) => ({ id: c.id, quote: c.quote, marker: c.marker })),
+          ...result.citations.map((c) => ({ id: c.id, quote: c.quote, emphasis: c.emphasis, marker: c.marker })),
           ...(result.visual ? [{ id: result.visual.id, marker: result.visual.marker }] : []),
         ];
         set({
@@ -654,7 +660,8 @@ export const useStore = create<StoreState>((set, get) => ({
     const r = get().guideRun;
     if (r) set({ guideRun: { ...r, reasoningOpen: !r.reasoningOpen } });
   },
-  closeGuideRun: () => { agentAbort?.abort(); set({ guideRun: null, scratchpad: [], guide: null, busy: false }); },
+  closeGuideRun: () => { agentAbort?.abort(); set({ guideRun: null, scratchpad: [], guide: null, pendingConfirm: null, busy: false }); },
+  resolveConfirm: (ok) => { confirmResolver?.(ok); },
 
   clearChat: () => {
     agentAbort?.abort();
@@ -735,6 +742,30 @@ const MAX_AGENT_STEPS = 16;
 
 // Autonomous Guide agent loop: observe the current page, ask the agent for ONE action
 // (which may navigate to another page), perform it, save evidence, repeat — then summarize.
+// Pause the run and surface a confirmation card in the side panel; resolves when the
+// user approves/denies (or false if the run is aborted while waiting).
+function requestConfirm(
+  set: (p: Partial<StoreState>) => void,
+  risk: NonNullable<ReturnType<typeof actionRisk>>,
+  instruction: string,
+  signal: AbortSignal,
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (ok: boolean) => {
+      if (done) return;
+      done = true;
+      confirmResolver = null;
+      set({ pendingConfirm: null });
+      resolve(ok);
+    };
+    confirmResolver = finish;
+    if (signal.aborted) return finish(false);
+    signal.addEventListener('abort', () => finish(false), { once: true });
+    set({ pendingConfirm: { kind: risk.kind, label: risk.label, title: risk.title, detail: risk.detail, instruction } });
+  });
+}
+
 async function runAgent(
   get: () => StoreState,
   set: (p: Partial<StoreState>) => void,
@@ -750,6 +781,7 @@ async function runAgent(
   const history: { instruction: string; action: string; observation: string }[] = [];
   let finished = false;
   let failure = '';
+  let stopReason = '';
   await captureStep(get, set, 0, undefined, alive, selection);
   try {
     for (let t = 0; t < MAX_AGENT_STEPS; t++) {
@@ -766,6 +798,14 @@ async function runAgent(
       if (!res.ok) throw new Error(data?.error || 'The agent failed.');
       const { instruction, action, evidence } = data as { instruction: string; action: BrowserAction; evidence?: EvidenceRequest };
       if (!action || !['navigate', 'click', 'fill', 'finish'].includes(action.type)) throw new Error('The agent returned an invalid action.');
+      // Gate irreversible actions (checkout, posting, cancel/delete) behind user approval.
+      const risk = site ? actionRisk(action) : null;
+      if (risk) {
+        if (action.id) set({ guide: { steps: [{ id: action.id, instruction }], current: 0 } }); // highlight the control to be actioned
+        const approved = await requestConfirm(set, risk, instruction, signal);
+        if (!alive()) return;
+        if (!approved) { set({ guide: null }); stopReason = `You declined the ${risk.label} step: “${instruction}”.`; break; }
+      }
       const run = get().guideRun!;
       const idx = run.journey.length;
       set({ guideRun: { ...run, journey: [...run.journey, { instruction, status: 'running' }] } });
@@ -813,7 +853,7 @@ async function runAgent(
   const known = state ? verifySandboxTask(task, state, get().library, initialState) : null;
   let verified: VerificationResult = { completed: false, reason: 'No completion check ran.', answer: '', source: 'unavailable' };
   if (failure || !finished) {
-    const reason = failure || 'The step limit was reached before the agent finished the task.';
+    const reason = failure || stopReason || 'The step limit was reached before the agent finished the task.';
     verified = { completed: false, reason, answer: reason, source: 'unavailable' };
   } else if (known?.supported) {
     verified = { ...known, source: 'sandbox-state' };
@@ -844,7 +884,7 @@ async function runAgent(
   let finalAnswer = `${answer}${references ? ` ${references}` : ' No screenshot evidence was selected; see Journey for action snapshots.'}`;
   // The model writes the answer from actual outcomes and explicitly selected evidence.
   // The verified runtime status cannot be upgraded by the summarizer.
-  if (!failure) {
+  if (!failure && !stopReason) {
     try {
       const res = await fetch('/api/summarize', {
         method: 'POST', signal,

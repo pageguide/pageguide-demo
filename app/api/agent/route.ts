@@ -19,6 +19,7 @@ Rules:
 - "navigate": go to a page. Provide either a link block "id" (has control:true, type link) or an absolute "url". Use this to reach the right site/page for the task.
 - "click": press a button/link with that control "id". "fill": type "value" into an input "id".
 - "finish": the task is complete (or cannot proceed). Emit this when done.
+- Do EXACTLY what the task asks and nothing more. For read-only tasks (find, browse, read, open, view, explore, locate, show, search), do NOT post, comment, vote, like, follow, save/bookmark, add to cart, check out, or change settings — only navigate and open the requested content, then finish. Take a write/submit action ONLY when the task explicitly asks for it (e.g. "post", "comment", "buy", "save", "follow"). Never invent extra actions to manufacture proof.
 - Only use ids that exist in the CURRENT page blocks. Control actions need control:true blocks.
 - The runtime records a separate journey snapshot after EVERY step; these are NOT saved evidence.
 - Routine clicks, filling fields, and moving between checkout screens belong only in Journey snapshots, NOT saved evidence. Select final confirmations or substantive findings, unless the user explicitly asks for an intermediate state.

@@ -44,17 +44,32 @@ export function stateUrl(s: SandboxState): string {
   const params = new URLSearchParams();
   if (s.query) params.set('q', s.query);
   if (s.view === 'checkout') params.set('stage', s.checkoutStage);
+  // These sites don't carry the selection in the path, so encode it (and floor) for refresh/back-forward.
+  if (s.site === 'met-map') { if (s.mapFloor === 2) params.set('floor', '2'); if (s.selected) params.set('room', s.selected); }
+  if (s.site === 'soundcloud' && s.selected) params.set('track', s.selected);
   return `${sandboxUrl(s.site)}${path}${params.size ? `?${params}` : ''}`;
 }
 export function routeSandbox(s: SandboxState, url: string, lib: Library): SandboxState {
-  const u = new URL(url), [path, selected = ''] = u.pathname.split('/').filter(Boolean);
+  const u = new URL(url), [path, pathSelected = ''] = u.pathname.split('/').filter(Boolean);
   const allowed = s.site === 'amazon' ? ['cart', 'checkout', 'orders', 'wishlist'] : s.site === 'quora' ? ['settings', 'ask', 'bookmarks'] : s.site === 'soundcloud' ? ['library'] : ['map'];
   const view = allowed.includes(path) ? path as SandboxState['view']
-    : path === 'product' && s.site === 'amazon' && lib.products.some((p) => p.id === selected) ? 'product'
-    : path === 'post' && s.site === 'quora' && allPosts(s, lib).some((p) => p.id === selected) ? 'post' : 'home';
+    : path === 'product' && s.site === 'amazon' && lib.products.some((p) => p.id === pathSelected) ? 'product'
+    : path === 'post' && s.site === 'quora' && allPosts(s, lib).some((p) => p.id === pathSelected) ? 'post' : 'home';
   const stage = u.searchParams.get('stage');
   const checkoutStage = stage === 'confirmation' && s.orders.length ? 'confirmation' : stage === 'review' && shippingValid(s) ? 'review' : 'shipping';
-  return { ...s, view, selected, checkoutStage, query: (u.searchParams.get('q') || '').slice(0, 200), notice: '', revision: s.revision + 1 };
+  // Restore the query-serialized selection for sites that don't carry it in the path.
+  let mapFloor = s.mapFloor;
+  let selected = pathSelected;
+  if (s.site === 'met-map') {
+    mapFloor = u.searchParams.get('floor') === '2' ? 2 : 1;
+    const room = u.searchParams.get('room') || '';
+    const match = ROOMS.find((r) => r.id === room);
+    selected = match && match.floor === mapFloor ? room : '';
+  } else if (s.site === 'soundcloud') {
+    const track = u.searchParams.get('track') || '';
+    selected = TRACKS.some((t) => t.id === track) ? track : '';
+  }
+  return { ...s, view, selected, mapFloor, checkoutStage, query: (u.searchParams.get('q') || '').slice(0, 200), notice: '', revision: s.revision + 1 };
 }
 const heading = (id: string, text: string, group?: string): Block => ({ id, type: 'heading', text, level: group ? 2 : 1, group });
 const paragraph = (id: string, text: string, group?: string): Block => ({ id, type: 'paragraph', text, group });
@@ -186,6 +201,19 @@ function metMapDoc(s: SandboxState): PageDoc {
   return { url: stateUrl(s), title: 'The Met Map sandbox', siteName: 'Met Museum map demo', sandbox: 'met-map', blocks };
 }
 
+// Irreversible / consequential sandbox actions the agent must get user approval for
+// before performing them: checkout/payment, publishing content, and cancellation/delete.
+export function actionRisk(action: BrowserAction): { kind: 'buy' | 'post' | 'delete'; label: string; title: string; detail: string } | null {
+  if (action.type !== 'click' || !action.id) return null;
+  const id = action.id;
+  if (id === 'pay-demo') return { kind: 'buy', label: 'payment', title: 'Confirm demo checkout', detail: 'The agent wants to place the order and run the simulated payment. No real money is charged, but this completes checkout.' };
+  if (id.startsWith('cancel-')) return { kind: 'delete', label: 'order cancellation', title: 'Confirm cancellation', detail: 'The agent wants to cancel a demo order, which changes its status.' };
+  if (id === 'post-question') return { kind: 'post', label: 'question', title: 'Confirm posting', detail: 'The agent wants to publish a demo question to the community.' };
+  if (id === 'submit-answer') return { kind: 'post', label: 'answer', title: 'Confirm posting', detail: 'The agent wants to publish a demo answer.' };
+  if (id.startsWith('submit-comment-')) return { kind: 'post', label: 'comment', title: 'Confirm posting', detail: 'The agent wants to publish a demo comment.' };
+  return null;
+}
+
 /** User clicks and agent actions have identical validation and state transitions. */
 export function applySandboxAction(s: SandboxState, action: BrowserAction, lib: Library): { state: SandboxState; observation: string } {
   const target = sandboxDoc(s, lib).blocks.find((b) => b.id === action.id && b.control);
@@ -302,13 +330,14 @@ export function verifySandboxTask(task: string, s: SandboxState, lib: Library, i
       checks.push({ passed: Boolean(track && s.liked.includes(track)), result: 'The requested track is liked.', missing: 'The requested track is not liked.' });
     }
     if (/\bfollow\b/i.test(task)) {
-      const artist = /nova/i.test(task) ? 'Nova Vale' : /lena/i.test(task) ? 'Lena Parks' : '';
+      const artist = /nova/i.test(task) ? 'Nova Vale' : /lena/i.test(task) ? 'Lena Parks' : /coastline|green room/i.test(task) ? 'The Coastline' : '';
       checks.push({ passed: Boolean(artist && s.followedTopics.includes(artist)), result: `You are following ${artist}.`, missing: 'The requested artist is not followed.' });
     }
   } else if (s.site === 'met-map') {
-    const room = /temple/i.test(task) ? 'temple' : /european paintings|impressionists/i.test(task) ? 'impressionists' : /modern/i.test(task) ? 'modern' : '';
+    // Accept any gallery that legitimately matches the task name (two galleries are "European Paintings").
+    const rooms = /temple/i.test(task) ? ['temple'] : /european paintings|impressionists/i.test(task) ? ['impressionists', 'european-old-masters'] : /modern/i.test(task) ? ['modern'] : [];
     if (/\bfloor 2\b/i.test(task)) checks.push({ passed: s.mapFloor === 2, result: 'Floor 2 is open on the map.', missing: 'Floor 2 is not open.' });
-    if (/\b(open|find|locate|show)\b/i.test(task) && room) checks.push({ passed: s.selected === room, result: 'The requested gallery is selected on the museum map.', missing: 'The requested gallery is not selected on the map.' });
+    if (/\b(open|find|locate|show)\b/i.test(task) && rooms.length) checks.push({ passed: rooms.includes(s.selected), result: 'The requested gallery is selected on the museum map.', missing: 'The requested gallery is not selected on the map.' });
   }
   if (!checks.length) return { supported: false, completed: false, answer: 'This task needs page-evidence verification.', reason: 'No deterministic state check applies to this task.' };
   const completed = checks.every((c) => c.passed), reason = completed ? 'All requested state changes were checked against the actual sandbox state.' : checks.filter((c) => !c.passed).map((c) => c.missing).join(' ');

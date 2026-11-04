@@ -4,23 +4,38 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Block, PageDoc, PageSelection } from '@/lib/types';
 import { readPageSelection } from '@/lib/page-selection';
 
-type Evidence = { id: string; quote?: string; marker?: string; annotation?: string };
+type Evidence = { id: string; quote?: string; emphasis?: string; marker?: string; annotation?: string };
 
 const HILITE_CSS = `
-[data-pg-ev], mark[data-pg-ev]{background:#fff5ed !important;color:#553b2c !important;box-shadow:0 0 0 1px #edc7ab;border-radius:5px}
-[data-pg-focus], mark[data-pg-focus]{background:#ffe6d5 !important;color:#513524 !important;box-shadow:0 0 0 1.5px #dc986a !important;border-radius:5px}
+/* whole-block fallback highlight (used only when the quote can't be located) */
+[data-pg-ev]{background:#fff5ed !important;color:#553b2c !important;box-shadow:0 0 0 1px #edc7ab;border-radius:5px}
+[data-pg-focus]{background:#ffe6d5 !important;color:#513524 !important;box-shadow:0 0 0 1.5px #dc986a !important;border-radius:5px}
 [data-pg-ev] a,[data-pg-focus] a,a[data-pg-ev],a[data-pg-focus]{color:#9c4f25 !important;text-decoration-color:#d6a07d !important}
+/* continuous span highlight: flat fragments merge into one band, rounded only at the ends */
+mark[data-pg-mark]{background:#ffe7d4 !important;color:#4a3526 !important;padding:0;border-radius:0;box-shadow:none}
+mark[data-pg-mark][data-pg-sfocus]{background:#ffd7bb !important;color:#43301f !important}
+mark[data-pg-strong]{background:#f7b27a !important;color:#3f2c1b !important}
+mark[data-pg-strong][data-pg-sfocus]{background:#f3a060 !important}
+mark[data-pg-start]{border-top-left-radius:5px;border-bottom-left-radius:5px;padding-left:1px}
+mark[data-pg-end]{border-top-right-radius:5px;border-bottom-right-radius:5px;padding-right:1px}
+mark[data-pg-mark] a{color:#8f4a22 !important;text-decoration-color:#d6a07d !important}
 [data-pg-gd]{box-shadow:0 0 0 3px #f0792b !important;background:#fff6ee !important;border-radius:6px;scroll-margin:100px}
-mark[data-pg-ev],mark[data-pg-focus]{padding:0 1px}
 sup[data-pg-badge]{background:#ec3973;color:#fff;border-radius:5px;padding:2px 5px;font-size:9px;font-weight:700;margin:0 3px;vertical-align:super;cursor:pointer;line-height:1.4;font-family:ui-sans-serif,system-ui,sans-serif;text-decoration:none}
 sup[data-pg-badge][data-focused]{box-shadow:0 0 0 2px #f3ceb4}
 html{scroll-behavior:smooth}
 `;
 
-// Wrap the exact `quote` (whitespace-tolerant) inside `el` in <mark>s — even when
-// it spans inline elements (e.g. links). Returns the last <mark> created, or null
-// if the quote wasn't found (caller then marks the whole block).
-function markSpan(el: Element, quote: string, focused: boolean): Element | null {
+const QUOTE_RE = (q: string) => {
+  const pattern = q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+  return pattern ? new RegExp(pattern, 'i') : null;
+};
+
+// Highlight the broad `quote` (whitespace-tolerant) inside `el` as ONE continuous band —
+// even when it spans inline elements (e.g. links) — and, if `emphasis` is a sub-span of the
+// quote, highlight that part more strongly. Fragments share a flat style so they read as a
+// single stream; only the first/last get rounded ends. Returns the last <mark> (for the
+// badge + scroll), or null if the quote wasn't found (caller then marks the whole block).
+function markSpan(el: Element, quote: string, emphasis: string | undefined, focused: boolean): Element | null {
   const d = el.ownerDocument;
   const walker = d.createTreeWalker(el, NodeFilter.SHOW_TEXT);
   const nodes: { node: Text; start: number; len: number }[] = [];
@@ -31,38 +46,93 @@ function markSpan(el: Element, quote: string, focused: boolean): Element | null 
     nodes.push({ node: n as Text, start: full.length, len: t.length });
     full += t;
   }
+  const broadRe = QUOTE_RE(quote);
+  const broad = broadRe && broadRe.exec(full);
+  if (!broad) return null;
+  const s = broad.index;
+  const e = broad.index + broad[0].length;
+
+  // locate the optional emphasis span inside the broad [s, e] region
+  let es = -1;
+  let ee = -1;
+  if (emphasis) {
+    const emRe = QUOTE_RE(emphasis);
+    const em = emRe && emRe.exec(full.slice(s, e));
+    if (em) { es = s + em.index; ee = s + em.index + em[0].length; }
+  }
+
+  // break [s, e] into non-overlapping segments at the emphasis boundaries
+  const bounds = [...new Set([s, e, ...(ee > es && es >= 0 ? [es, ee] : [])])].sort((a, b) => a - b);
+  const segments: { a: number; b: number; strong: boolean }[] = [];
+  for (let i = 0; i < bounds.length - 1; i++) {
+    const a = bounds[i];
+    const b = bounds[i + 1];
+    if (a < b) segments.push({ a, b, strong: es >= 0 && a >= es && b <= ee });
+  }
+
+  const created: { mark: Element; start: number }[] = [];
+  for (const nd of nodes) {
+    const ndEnd = nd.start + nd.len;
+    if (ndEnd <= s || nd.start >= e) continue;
+    // sub-ranges of each segment that fall in this text node, wrapped back-to-front
+    const ranges = segments
+      .map((seg) => ({ a: Math.max(seg.a, nd.start), b: Math.min(seg.b, ndEnd), strong: seg.strong }))
+      .filter((r) => r.a < r.b)
+      .sort((x, y) => x.a - y.a);
+    for (let i = ranges.length - 1; i >= 0; i--) {
+      const r = ranges[i];
+      try {
+        const range = d.createRange();
+        range.setStart(nd.node, r.a - nd.start);
+        range.setEnd(nd.node, r.b - nd.start);
+        const mark = d.createElement('mark');
+        mark.setAttribute('data-pg-mark', '');
+        if (r.strong) mark.setAttribute('data-pg-strong', '');
+        if (focused) mark.setAttribute('data-pg-sfocus', '');
+        range.surroundContents(mark);
+        created.push({ mark, start: r.a });
+      } catch {
+        /* skip this segment */
+      }
+    }
+  }
+  if (!created.length) return null;
+  created.sort((a, b) => a.start - b.start);
+  created[0].mark.setAttribute('data-pg-start', ''); // round the visual start
+  created[created.length - 1].mark.setAttribute('data-pg-end', ''); // round the visual end
+  return created[created.length - 1].mark; // last in document order
+}
+
+// Locate the exact `quote` (whitespace-tolerant) inside a plain-text block and
+// split it into before/hit/after so the reader-fallback can wrap just the span.
+function splitQuote(text: string, quote?: string): { before: string; hit: string; after: string } | null {
+  if (!quote) return null;
   const pattern = quote
     .trim()
     .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     .replace(/\s+/g, '\\s+');
   if (!pattern) return null;
-  const m = new RegExp(pattern, 'i').exec(full);
+  const m = new RegExp(pattern, 'i').exec(text);
   if (!m) return null;
-  const s = m.index;
-  const e = m.index + m[0].length;
-  const attr = focused ? 'data-pg-focus' : 'data-pg-ev';
-  // wrap each overlapping text-node segment, back-to-front so offsets stay valid
-  const overlaps = nodes.filter((nd) => nd.start < e && nd.start + nd.len > s);
-  let lastMark: Element | null = null;
-  for (let i = overlaps.length - 1; i >= 0; i--) {
-    const nd = overlaps[i];
-    const a = Math.max(0, s - nd.start);
-    const b = Math.min(nd.len, e - nd.start);
-    if (a >= b) continue;
-    try {
-      const range = d.createRange();
-      range.setStart(nd.node, a);
-      range.setEnd(nd.node, b);
-      const mark = d.createElement('mark');
-      mark.setAttribute(attr, '');
-      mark.setAttribute('data-pg-mark', '');
-      range.surroundContents(mark);
-      if (!lastMark) lastMark = mark; // back-to-front: first wrapped is the last in document order
-    } catch {
-      /* skip this segment */
-    }
-  }
-  return lastMark;
+  return { before: text.slice(0, m.index), hit: text.slice(m.index, m.index + m[0].length), after: text.slice(m.index + m[0].length) };
+}
+
+function QuoteSpan({ text, quote, emphasis, focused }: { text: string; quote?: string; emphasis?: string; focused: boolean }) {
+  const parts = splitQuote(text, quote);
+  if (!parts) return <>{text}</>;
+  // One continuous band for the broad quote; a stronger inner mark for the emphasis span.
+  const broadCls = focused ? 'rounded-[5px] px-[1px] bg-[#ffd7bb] text-[#43301f]' : 'rounded-[5px] px-[1px] bg-[#ffe7d4] text-[#4a3526]';
+  const strongCls = focused ? 'rounded-[3px] bg-[#f3a060] text-[#3f2c1b]' : 'rounded-[3px] bg-[#f7b27a] text-[#3f2c1b]';
+  const inner = emphasis ? splitQuote(parts.hit, emphasis) : null;
+  return (
+    <>
+      {parts.before}
+      <mark className={broadCls}>
+        {inner ? (<>{inner.before}<mark className={strongCls}>{inner.hit}</mark>{inner.after}</>) : parts.hit}
+      </mark>
+      {parts.after}
+    </>
+  );
 }
 
 export default function PageView({
@@ -172,7 +242,7 @@ export default function PageView({
       const el = d.querySelector(`[data-pg-id="${ev.id}"],[data-pg-selection-ids~="${ev.id}"]`);
       if (!el) continue;
       const focused = ev.id === focusedEvidence;
-      const lastMark = ev.quote ? markSpan(el, ev.quote, focused) : null;
+      const lastMark = ev.quote ? markSpan(el, ev.quote, ev.emphasis, focused) : null;
       if (!lastMark) el.setAttribute(focused ? 'data-pg-focus' : 'data-pg-ev', '');
       // PageGuide annotation badge (the citation marker) on the page
       if (ev.marker) {
@@ -245,7 +315,10 @@ function ReaderFallback({
       <div className="mx-auto max-w-[760px] px-6 py-7">
         {doc.blocks.map((b) => {
           const ev = byId.get(b.id);
-          const cls = b.id === guideId ? 'pg-guide' : ev ? (b.id === focusedEvidence ? 'pg-visual' : 'pg-evidence') : '';
+          const focused = b.id === focusedEvidence;
+          // Highlight just the quoted span when it matches; otherwise fall back to a whole-block class.
+          const span = ev && ev.quote && (b.type === 'heading' || !['link', 'image'].includes(b.type)) ? splitQuote(b.text, ev.quote) : null;
+          const cls = b.id === guideId ? 'pg-guide' : ev && !span ? (focused ? 'pg-visual' : 'pg-evidence') : '';
           return (
             <div
               key={b.id}
@@ -256,10 +329,14 @@ function ReaderFallback({
               {b.type === 'link' ? (
                 <button onClick={(e) => { e.stopPropagation(); onBlockClick(b); }} className="text-base text-orange underline underline-offset-4">{b.text}</button>
               ) : b.type === 'heading' ? (
-                <h2 className={b.level === 1 ? 'mb-5 mt-3 text-3xl font-semibold text-ink dark:text-night-ink' : 'mb-2 mt-6 text-xl font-semibold text-ink dark:text-night-ink'}>{b.text}</h2>
+                <h2 className={b.level === 1 ? 'mb-5 mt-3 text-3xl font-semibold text-ink dark:text-night-ink' : 'mb-2 mt-6 text-xl font-semibold text-ink dark:text-night-ink'}>
+                  {span ? <QuoteSpan text={b.text} quote={ev?.quote} emphasis={ev?.emphasis} focused={focused} /> : b.text}
+                </h2>
               ) : b.type === 'image' && b.src ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={b.src} alt={b.text} className="max-h-72 rounded-md border border-line" />
+              ) : span ? (
+                <QuoteSpan text={b.text} quote={ev?.quote} emphasis={ev?.emphasis} focused={focused} />
               ) : (
                 b.text
               )}

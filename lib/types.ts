@@ -65,7 +65,8 @@ export interface Usage {
 export interface TextCitation {
   marker: string;
   id: string;
-  quote?: string;
+  quote?: string; // the broad supporting passage (continuous highlight)
+  emphasis?: string; // optional key phrase within `quote`, highlighted more strongly
 }
 
 // Visual evidence: an image block plus a normalized bounding box [x, y, w, h]
