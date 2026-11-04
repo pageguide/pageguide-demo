@@ -421,10 +421,20 @@ function EvidenceImage({ ev, compact = false }: { ev: Evidence; compact?: boolea
   const alignRight = b ? b[0] + b[2] / 2 > .5 : false;
   const labelAbove = b ? b[1] + b[3] > .8 && b[1] > .12 : false;
   const labelInside = b ? b[1] + b[3] > .8 && !labelAbove : false;
-  return <div className={`overflow-auto rounded-lg border border-line ${compact ? 'max-h-56' : 'max-h-[75vh]'}`}>
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // Scroll a tall full-page capture so the highlighted target region is centered, not the page top.
+  const focusBox = (img: HTMLImageElement) => {
+    const cont = scrollRef.current;
+    if (!cont || !b || !img.clientHeight) return;
+    const centerY = (b[1] + b[3] / 2) * img.clientHeight;
+    cont.scrollTop = Math.max(0, Math.min(centerY - cont.clientHeight / 2, cont.scrollHeight - cont.clientHeight));
+  };
+  const imgRef = useRef<HTMLImageElement>(null);
+  useEffect(() => { const img = imgRef.current; if (img?.complete) focusBox(img); }); // eslint-disable-line react-hooks/exhaustive-deps
+  return <div ref={scrollRef} className={`overflow-auto rounded-lg border border-line ${compact ? 'max-h-56' : 'max-h-[75vh]'}`}>
     <div className="relative">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={ev.imageUrl} alt={ev.caption || ev.name} className="block h-auto w-full" />
+      <img ref={imgRef} onLoad={(e) => focusBox(e.currentTarget)} src={ev.imageUrl} alt={ev.caption || ev.name} className="block h-auto w-full" />
       {b && <span data-testid="evidence-box" className="pointer-events-none absolute rounded-sm border-2 border-orange bg-orange/10" style={{ left: `${b[0] * 100}%`, top: `${b[1] * 100}%`, width: `${b[2] * 100}%`, height: `${b[3] * 100}%` }} />}
       {b && ev.annotation && <span data-testid="evidence-annotation" className="pointer-events-none absolute break-words rounded bg-orange px-2 py-1 text-xs text-white [overflow-wrap:anywhere]" style={{
         ...(alignRight ? { right: `${(1 - b[0] - b[2]) * 100}%` } : { left: `${b[0] * 100}%` }),

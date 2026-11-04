@@ -197,6 +197,6 @@ test('provider errors are surfaced, not silently swallowed', async ({ page }) =>
 test('Terminal view is disabled', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('button', { name: /Terminal/ })).toHaveCount(0);
-  await expect(page.getByRole('region', { name: 'Find saved websites' }).getByRole('button')).toHaveCount(6);
+  await expect(page.getByRole('region', { name: 'Find saved websites' }).getByRole('button')).toHaveCount(4);
   await expect(page.getByRole('region', { name: 'Guide interactive websites' }).getByRole('button')).toHaveCount(2);
 });
