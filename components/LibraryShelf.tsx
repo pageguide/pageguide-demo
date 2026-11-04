@@ -26,8 +26,7 @@ export default function LibraryShelf() {
     <div className="pg-scroll h-full overflow-auto bg-[#fffaf6] dark:bg-night">
       <div className="mx-auto max-w-4xl px-5 py-8 md:px-8">
         <p className="text-sm font-medium text-orange">YOUR PAGEGUIDE PLAYGROUND</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-ink dark:text-night-ink">Less waiting. More doing.</h1>
-        <p className="mt-3 max-w-xl text-base leading-relaxed text-muted dark:text-night-muted">Saved real websites open from local copies. Interactive sandboxes let you and Guide use the same working controls.</p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-ink dark:text-night-ink">Navigate a Webpage - Locating Information</h1>
         {pageError && <p role="alert" className="mt-5 rounded-xl border border-orange-ring bg-orange-soft p-4 text-sm text-[#8c4f29]">{pageError}</p>}
         <section className="mt-8" aria-label="Find saved websites">
           <h2 className="text-lg font-semibold text-ink dark:text-night-ink">Find <span className="ml-2 text-sm font-normal text-muted dark:text-night-muted">{library.articles.length} saved real websites</span></h2>
@@ -46,6 +45,7 @@ export default function LibraryShelf() {
         </section>
         <section className="mt-8" aria-label="Guide interactive websites">
           <h2 className="text-lg font-semibold text-ink dark:text-night-ink">Guide <span className="ml-2 text-sm font-normal text-muted dark:text-night-muted">4 isolated environments</span></h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted dark:text-night-muted">Guide can work on real websites. For this demonstration, it runs in an isolated environment inspired by real websites, with no login requirements or bot restrictions.</p>
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             {(['amazon', 'quora', 'soundcloud', 'met-map'] as const).map((site) => (
               <button key={site} onClick={() => void loadUrl(sandboxUrl(site))} className="library-card text-left">
@@ -56,7 +56,6 @@ export default function LibraryShelf() {
               </button>
             ))}
           </div>
-          <p className="mt-2 text-xs text-muted dark:text-night-muted">Inspired by real sites, not connected to them. No login or real purchases. Guide requires the configured model API key.</p>
         </section>
         <section className="mt-8" aria-label="Custom website">
           <h2 className="text-lg font-semibold text-ink dark:text-night-ink">Bring your own website</h2>
