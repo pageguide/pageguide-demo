@@ -1,5 +1,6 @@
 # Sandbox media
 
+- `amazon-logo.svg`: Amazon wordmark from https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg, adapted to white lettering for the dark header. Used to identify the local Amazon-inspired sandbox, not affiliation.
 - `met-floor-1.webp` and `met-floor-2.webp`: cropped museum floor-plan artwork from the user's supplied references. Only the floor-plan tiles are images: the search panel, gallery hotspots, place markers, floor selector, zoom, panning, and route overlays are live controls. Positions/routes and service information in this demo are illustrative, not live museum navigation.
 - `midnight.wav`, `summer.wav`, `greenroom.wav`: original, locally generated 32-second instrumental previews for the fictional demo artists.
 - Photos are locally hosted crops downloaded from Unsplash:

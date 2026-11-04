@@ -928,8 +928,8 @@ async function captureStep(
   const proofIds = requestedTarget ? [requestedTarget] : ['current-state', 'notice', 'subtotal', 'language-current', 'order-confirmation'].filter((id) => doc.blocks.some((b) => b.id === id));
   if (ev && proofIds.length) set({ evidence: proofIds.map((id) => ({ id, marker: String(index) })), focusedEvidence: null });
   try {
-    const { capturePage, screenshotBox } = await import('./capture-page');
-    const imageUrl = await capturePage();
+    const { capturePageWithBox } = await import('./capture-page');
+    const { imageUrl, box } = await capturePageWithBox(ev?.annotate && requestedTarget ? requestedTarget : undefined);
     if (!alive()) return;
     const capturedAt = new Date().toISOString();
     const run = get().guideRun!;
@@ -943,7 +943,7 @@ async function captureStep(
         url: doc.url, capturedAt, caption: ev.description || ev.name.replace(/-/g, ' '),
         annotation: ev.annotate,
         targetId: requestedTarget || undefined,
-        box: ev.annotate && requestedTarget ? screenshotBox(requestedTarget) : undefined,
+        box,
         observation: doc.blocks.filter((b) => !b.control).map((b) => b.text).join('\n'),
       };
     }

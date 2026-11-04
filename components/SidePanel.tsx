@@ -369,13 +369,19 @@ function EvidenceBadge({ ev, onOpen, children, ariaLabel }: { ev: Evidence; onOp
 
 function EvidenceImage({ ev, compact = false }: { ev: Evidence; compact?: boolean }) {
   const b = ev.box;
+  const alignRight = b ? b[0] + b[2] / 2 > .5 : false;
+  const labelAbove = b ? b[1] + b[3] > .8 && b[1] > .12 : false;
+  const labelInside = b ? b[1] + b[3] > .8 && !labelAbove : false;
   return <div className={`overflow-auto rounded-lg border border-line ${compact ? 'max-h-56' : 'max-h-[75vh]'}`}>
     <div className="relative">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={ev.imageUrl} alt={ev.caption || ev.name} className="block h-auto w-full" />
-      {b && <span className="pointer-events-none absolute rounded-sm border-2 border-orange bg-orange/10" style={{ left: `${b[0] * 100}%`, top: `${b[1] * 100}%`, width: `${b[2] * 100}%`, height: `${b[3] * 100}%` }}>
-        {ev.annotation && <span className="absolute left-0 top-full mt-1 whitespace-nowrap rounded bg-orange px-2 py-1 text-xs text-white">{ev.annotation}</span>}
-      </span>}
+      {b && <span data-testid="evidence-box" className="pointer-events-none absolute rounded-sm border-2 border-orange bg-orange/10" style={{ left: `${b[0] * 100}%`, top: `${b[1] * 100}%`, width: `${b[2] * 100}%`, height: `${b[3] * 100}%` }} />}
+      {b && ev.annotation && <span data-testid="evidence-annotation" className="pointer-events-none absolute break-words rounded bg-orange px-2 py-1 text-xs text-white [overflow-wrap:anywhere]" style={{
+        ...(alignRight ? { right: `${(1 - b[0] - b[2]) * 100}%` } : { left: `${b[0] * 100}%` }),
+        ...(labelAbove ? { bottom: `${(1 - b[1]) * 100}%`, marginBottom: 4 } : { top: `${(labelInside ? b[1] : b[1] + b[3]) * 100}%`, marginTop: 4 }),
+        maxWidth: `min(18rem, calc(${(alignRight ? b[0] + b[2] : 1 - b[0]) * 100}% - 8px))`,
+      }}>{ev.annotation}</span>}
     </div>
   </div>;
 }
