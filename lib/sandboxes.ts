@@ -1,5 +1,4 @@
 import type { Block, PageDoc } from './types';
-import { verifyManualTask } from './manual-task-verification';
 import type { Answer, Comment, Library, Post } from './library';
 import { TRACKS, ROOMS, AMENITIES } from './sandbox-media';
 import { MET_PLACES, placesForAmenity, amenityKey, floorLabel } from './met-places';
@@ -296,8 +295,6 @@ export function applySandboxAction(s: SandboxState, action: BrowserAction, lib: 
 }
 
 export function verifySandboxTask(task: string, s: SandboxState, lib: Library, initial?: SandboxState): { supported: boolean; completed: boolean; answer: string; reason: string } {
-  const manualVerdict = verifyManualTask(task, s, lib, initial);
-  if (manualVerdict) return manualVerdict;
   const checks: { passed: boolean; result: string; missing: string }[] = [];
   const mentioned = lib.products.filter((p) => new RegExp(`\\b${p.id.replace(/s$/, '')}s?\\b`, 'i').test(task));
   const paying = /\b(buy|purchase|pay|place an order|complete.{0,15}checkout|check out)\b/i.test(task);
