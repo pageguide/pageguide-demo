@@ -8,6 +8,7 @@ import { cachedPage, cachePage } from './page-cache';
 import { loadSavedPage } from './saved-client';
 import type { VerificationResult } from './verification';
 import { pageWithSelection } from './page-selection';
+import { readQuoraLanguage, saveQuoraLanguage } from './quora-i18n';
 import type {
   AskResult,
   AutoMode,
@@ -316,6 +317,7 @@ export const useStore = create<StoreState>((set, get) => ({
     if (!site) return;
     agentAbort?.abort();
     const state = initialSandbox(site);
+    if (site === 'quora') saveQuoraLanguage('English');
     set({ sandboxSessions: { ...get().sandboxSessions, [site]: state }, selection: null, doc: sandboxDoc(state, get().library), guide: null, guideRun: null, scratchpad: [], evidence: [], focusedEvidence: null, busy: false });
   },
 
@@ -325,6 +327,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const state = get().sandboxSessions[site];
     if (!state) throw new Error('Sandbox state is unavailable.');
     const result = applySandboxAction(state, action, get().library);
+    if (site === 'quora' && action.id === 'save-language') saveQuoraLanguage(result.state.language);
     const doc = sandboxDoc(result.state, get().library);
     let { navStack, navIndex } = get();
     // Typing updates state, not navigation history.
@@ -356,7 +359,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const site = sandboxSite(url);
       let doc: PageDoc | null = null;
       if (site) {
-        const state = routeSandbox(get().sandboxSessions[site] || initialSandbox(site), url, get().library);
+        const state = routeSandbox(get().sandboxSessions[site] || initialSandbox(site, site === 'quora' ? readQuoraLanguage() : 'English'), url, get().library);
         set({ sandboxSessions: { ...get().sandboxSessions, [site]: state } });
         doc = sandboxDoc(state, get().library);
       } else {
