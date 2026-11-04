@@ -42,6 +42,14 @@ export default function LibraryShelf() {
             ))}
           </div>
           <p className="mt-2 text-xs text-muted dark:text-night-muted">Original website HTML and styles, saved locally for speed. Scripts are removed for safety; these are snapshots, not live sessions.</p>
+          <section className="mt-6" aria-label="Custom website">
+            <h3 className="text-lg font-semibold text-ink dark:text-night-ink">Bring your own website</h3>
+            <form className="mt-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); if (url.trim()) void loadUrl(url); }}>
+              <input aria-label="Custom website URL" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://your-website.com" className="min-w-0 flex-1 rounded-xl border border-line bg-white px-4 py-3 text-base outline-orange dark:border-night-line dark:bg-night-panel dark:text-night-ink" />
+              <button className="rounded-xl bg-orange px-4 py-3 text-sm font-medium text-white" disabled={!url.trim()}>Open website</button>
+            </form>
+            <p className="mt-2 text-xs text-muted dark:text-night-muted">Custom sites use a safe read-only snapshot for Find. Repeat visits are cached for 5 minutes; use Refresh for fresh content.</p>
+          </section>
         </section>
         <section className="mt-8" aria-label="Guide interactive websites">
           <h2 className="text-lg font-semibold text-ink dark:text-night-ink">Guide <span className="ml-2 text-sm font-normal text-muted dark:text-night-muted">4 isolated environments</span></h2>
@@ -56,14 +64,6 @@ export default function LibraryShelf() {
               </button>
             ))}
           </div>
-        </section>
-        <section className="mt-8" aria-label="Custom website">
-          <h2 className="text-lg font-semibold text-ink dark:text-night-ink">Bring your own website</h2>
-          <form className="mt-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); if (url.trim()) void loadUrl(url); }}>
-            <input aria-label="Custom website URL" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://your-website.com" className="min-w-0 flex-1 rounded-xl border border-line bg-white px-4 py-3 text-base outline-orange dark:border-night-line dark:bg-night-panel dark:text-night-ink" />
-            <button className="rounded-xl bg-orange px-4 py-3 text-sm font-medium text-white" disabled={!url.trim()}>Open website</button>
-          </form>
-          <p className="mt-2 text-xs text-muted dark:text-night-muted">Custom sites use a safe read-only snapshot for Find. Repeat visits are cached for 5 minutes; use Refresh for fresh content.</p>
         </section>
       </div>
     </div>
