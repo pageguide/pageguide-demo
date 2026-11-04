@@ -96,6 +96,60 @@ body {
 .sandbox-primary { background: #ffd868; border-color: #efc54f; }
 .sandbox-primary:hover { background: #f9cd4e; }
 .sandbox-quora .sandbox-primary { background: #a32721; border-color: #a32721; color: white; }
+.sandbox-soundcloud { background: #111 !important; color: #f5f5f5 !important; }
+.sandbox-soundcloud main { background: #111; }
+.sandbox-soundcloud .sandbox-button { border-color: #4a4a4a; background: #252525; color: #f4f4f4; }
+.sandbox-soundcloud .sandbox-button:hover { background: #383838; }
+.sandbox-soundcloud section { border-color: #3b3b3b !important; background: #1b1b1b !important; box-shadow: none !important; }
+.sandbox-soundcloud h1, .sandbox-soundcloud h2 { color: #fff; }
+.sandbox-soundcloud input { background: #292929; border-color: #444; color: #fff; }
+.sandbox-met-map main { background: linear-gradient(135deg, #d9e8bb, #a8d6df); min-height: 100%; }
+.sandbox-met-map section { border-color: #244f7e !important; background: #f9fbf6 !important; box-shadow: 0 2px 8px #31516d2b !important; }
+.sandbox-met-map h1 { color: #193d6b; }
+.quora-header { position: sticky; top: 0; z-index: 2; border-bottom: 1px solid #ddd; background: #fff; }
+.quora-header-inner { display: flex; align-items: center; gap: 14px; max-width: 1160px; min-height: 56px; margin: 0 auto; padding: 0 14px; }
+.quora-logo { color: #b92b27; font-family: Georgia, serif; font-size: 31px; letter-spacing: -1.5px; }
+.quora-icons { display: flex; height: 56px; align-items: center; gap: 25px; color: #666; font-size: 23px; }
+.quora-icons .active { align-self: stretch; display: grid; place-items: center; border-bottom: 3px solid #b92b27; color: #b92b27; }
+.quora-search { display: flex; flex: 1; max-width: 370px; gap: 5px; }
+.quora-search label { margin: 0; min-width: 0; }
+.quora-search input { border-radius: 4px; padding: 7px 10px; font-size: 14px; background: #f7f7f8; }
+.quora-search .sandbox-button { display: none; }
+.quora-plus { border: 1px solid #ddd; border-radius: 18px; background: #fff; padding: 7px 16px; color: #666; font-weight: 600; white-space: nowrap; }
+.quora-profile { display: grid; width: 37px; height: 37px; place-items: center; border: 1px solid #ddd; border-radius: 50%; background: #fff; font-size: 19px; }
+.quora-globe { color: #666; font-size: 28px; }
+.sandbox-quora .quora-header .sandbox-button { border: 0; background: #b92b27; color: #fff; border-radius: 18px; padding: 7px 14px; margin: 0; white-space: nowrap; }
+.sandbox-quora .quora-header .sandbox-button:nth-last-child(-n+2) { background: transparent; color: #666; padding: 7px 3px; }
+.quora-layout { display: grid; grid-template-columns: 180px minmax(0, 640px) 300px; max-width: 1160px; gap: 22px; margin: 0 auto; padding: 20px 14px; }
+.quora-left { color: #5f5f5f; font-size: 14px; }
+.quora-create { width: 100%; border: 0; border-radius: 4px; background: #e5e5e5; padding: 10px; color: #666; text-align: left; font-size: 15px; }
+.quora-rail-item { display: flex; align-items: center; gap: 10px; padding: 9px 10px; line-height: 1.25; }
+.quora-rail-item span { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 4px; background: #ddd; font-size: 13px; }
+.quora-footer { margin-top: 15px; border-top: 1px solid #ddd; padding: 15px 10px; color: #777; line-height: 1.9; }
+.quora-feed { min-width: 0; }
+.quora-composer, .quora-post-card, .quora-panel, .quora-page-title, .quora-empty, .quora-notice { border: 1px solid #ddd; border-radius: 9px; background: #fff; box-shadow: 0 1px 1px #00000008; }
+.quora-composer { display: grid; grid-template-columns: 44px 1fr; gap: 10px; padding: 16px 18px 0; margin-bottom: 12px; color: #939393; font-size: 16px; }
+.quora-composer footer { grid-column: 1 / -1; display: flex; justify-content: space-around; border-top: 1px solid #eee; padding: 11px 0; color: #666; font-weight: 600; }
+.quora-post-card { margin-bottom: 12px; padding: 18px; }
+.quora-post-card h2 { margin: 0 0 4px; font-size: 18px; font-weight: 700; }
+.quora-post-card h2:first-child { font-size: 19px; }
+.quora-post-card p { margin: 5px 0; font-size: 15px; line-height: 1.45; }
+.quora-post-card p:nth-of-type(1) { color: #666; font-size: 14px; }
+.quora-post-card .sandbox-button { border-width: 0; padding: 7px 10px; margin: 7px 2px 0 0; color: #666; font-weight: 600; }
+.quora-post-card .sandbox-button:hover { background: #f2f2f2; }
+.quora-post-card .sandbox-button:first-of-type { color: #3566d8; }
+.quora-panel { margin-bottom: 12px; padding: 18px; }
+.quora-panel h2 { margin-top: 0; }
+.quora-panel .sandbox-button { display: block; width: 100%; margin: 6px 0; text-align: left; }
+.quora-page-title, .quora-empty, .quora-notice { padding: 17px; margin-bottom: 12px; }
+.quora-page-title h1 { margin: 0; }
+.quora-right { min-width: 0; }
+.quora-ad { height: 83px; display: grid; place-items: end center; padding-bottom: 9px; border: 1px solid #ddd; border-radius: 9px; background: #fff; color: #999; font-size: 13px; }
+.quora-topic-panel { margin-top: 12px; padding: 14px; border: 1px solid #ddd; border-radius: 9px; background: #fff; }
+.quora-topic-panel strong { display: block; margin-bottom: 8px; color: #555; }
+.quora-topic-panel .sandbox-button { display: block; width: 100%; border: 0; border-radius: 4px; padding: 7px; margin: 0; text-align: left; color: #555; }
+@media (max-width: 900px) { .quora-layout { grid-template-columns: minmax(0, 640px) 220px; justify-content: center; } .quora-left { display: none; } .quora-icons { display: none; } }
+@media (max-width: 650px) { .quora-layout { display: block; padding: 10px; } .quora-right { display: none; } .quora-header-inner { gap: 8px; } .quora-logo { font-size: 25px; } .quora-plus, .quora-globe { display: none; } .sandbox-quora .quora-header .sandbox-button:nth-last-child(-n+2) { display: none; } }
 
 /* Grounding highlights, shared by both surfaces */
 .pg-evidence {

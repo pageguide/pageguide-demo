@@ -33,7 +33,7 @@ export interface PageDoc {
   saved?: boolean; // original website HTML saved locally, with scripts removed
   savedAt?: string;
   sourceFile?: string;
-  sandbox?: 'amazon' | 'quora';
+  sandbox?: 'amazon' | 'quora' | 'soundcloud' | 'met-map';
 }
 
 export interface PageSelection {
@@ -121,6 +121,7 @@ export interface Evidence {
   label?: string;
   step?: number;
   annotation?: string;
+  targetId?: string; // page block that is visually marked while this evidence is active
   index: number; // 1-based badge number
   imageUrl: string;
   box?: [number, number, number, number]; // annotation bounding box (normalized)

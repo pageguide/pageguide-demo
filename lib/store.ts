@@ -80,7 +80,7 @@ interface StoreState {
 
   messages: ChatMessage[];
   busy: boolean;
-  evidence: { id: string; quote?: string; marker?: string }[]; // all cited spans of the current answer (persist)
+  evidence: { id: string; quote?: string; marker?: string; annotation?: string }[]; // all cited spans of the current answer (persist)
   focusedEvidence: string | null; // the one the user clicked (shown stronger)
   guide: GuideState | null;
   guideRun: GuideRun | null; // the autonomous Guide run (task card + journey + answer)
@@ -860,7 +860,12 @@ async function runAgent(
   }
   if (!alive()) return;
   const run = get().guideRun!;
-  set({ guideRun: { ...run, running: false, final: { status, answer: finalAnswer, reasoning: '', verification: verified } } });
+  const citedEvidence = selected.filter((e) => finalAnswer.includes(`[EV:${e.name}]`));
+  set({
+    evidence: citedEvidence.flatMap((e) => e.targetId ? [{ id: e.targetId, marker: String(e.index), annotation: e.annotation }] : []),
+    focusedEvidence: null,
+    guideRun: { ...run, running: false, final: { status, answer: finalAnswer, reasoning: '', verification: verified } },
+  });
 }
 
 async function captureStep(
@@ -894,6 +899,7 @@ async function captureStep(
         name: `${slug}-${index}`, label: ev.name.replace(/-/g, ' '), index, step, imageUrl,
         url: doc.url, capturedAt, caption: ev.description || ev.name.replace(/-/g, ' '),
         annotation: ev.annotate,
+        targetId: requestedTarget || undefined,
         box: ev.annotate && requestedTarget ? screenshotBox(requestedTarget) : undefined,
         observation: doc.blocks.filter((b) => !b.control).map((b) => b.text).join('\n'),
       };

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Block, PageDoc, PageSelection } from '@/lib/types';
 import { readPageSelection } from '@/lib/page-selection';
 
-type Evidence = { id: string; quote?: string; marker?: string };
+type Evidence = { id: string; quote?: string; marker?: string; annotation?: string };
 
 const HILITE_CSS = `
 [data-pg-ev], mark[data-pg-ev]{background:#fff5ed !important;color:#553b2c !important;box-shadow:0 0 0 1px #edc7ab;border-radius:5px}
@@ -12,7 +12,7 @@ const HILITE_CSS = `
 [data-pg-ev] a,[data-pg-focus] a,a[data-pg-ev],a[data-pg-focus]{color:#9c4f25 !important;text-decoration-color:#d6a07d !important}
 [data-pg-gd]{box-shadow:0 0 0 3px #f0792b !important;background:#fff6ee !important;border-radius:6px;scroll-margin:100px}
 mark[data-pg-ev],mark[data-pg-focus]{padding:0 1px}
-sup[data-pg-badge]{background:#a85024;color:#fff;border-radius:5px;padding:0 4px;font-size:9px;font-weight:700;margin:0 2px;vertical-align:super;cursor:pointer;line-height:1.4;font-family:ui-sans-serif,system-ui,sans-serif;text-decoration:none}
+sup[data-pg-badge]{background:#ec3973;color:#fff;border-radius:5px;padding:2px 5px;font-size:9px;font-weight:700;margin:0 3px;vertical-align:super;cursor:pointer;line-height:1.4;font-family:ui-sans-serif,system-ui,sans-serif;text-decoration:none}
 sup[data-pg-badge][data-focused]{box-shadow:0 0 0 2px #f3ceb4}
 html{scroll-behavior:smooth}
 `;
@@ -179,7 +179,8 @@ export default function PageView({
         const badge = d.createElement('sup');
         badge.setAttribute('data-pg-badge', '');
         if (focused) badge.setAttribute('data-focused', '');
-        badge.textContent = ev.marker;
+        badge.textContent = ev.annotation ? `${ev.marker} · ${ev.annotation}` : ev.marker;
+        badge.title = ev.annotation || `Evidence ${ev.marker}`;
         if (lastMark) lastMark.after(badge);
         else el.appendChild(badge);
       }
