@@ -7,7 +7,7 @@ import { useSandboxControls } from './sandbox-controls';
 export default function AmazonSandbox({ doc, render }: { doc: PageDoc; render: (b: Block) => ReactNode }) {
   const s = useStore(st => st.sandboxSessions.amazon)!;
   const products = useStore(st => st.library.products);
-  const { control, act, node, running } = useSandboxControls(doc);
+  const { control, act, node, running, isAwaiting } = useSandboxControls(doc);
   const [department, setDepartment] = useState('All');
   const [sort, setSort] = useState('featured');
   const [menu, setMenu] = useState(false);
@@ -18,7 +18,7 @@ export default function AmazonSandbox({ doc, render }: { doc: PageDoc; render: (
   const search = (query: string) => { act('search', query); act('search-submit'); };
   const image = (id: string, alt: string, className = '') => <img className={className} src={`/sandbox/${id}.jpg`} alt={alt} onError={e => { e.currentTarget.style.visibility = 'hidden'; }} />;
   return <div className="az-app">
-    <header className="az-header"><button className="az-logo" aria-label="Amazon home" onClick={() => act('home')}><img src="/sandbox/amazon-logo.svg" alt="" /></button><div className="az-delivery"><small>Deliver to</small><b>⌖ Demo City 10001</b></div>
+    <header className="az-header"><button {...node('home')} className={`az-logo ${node('home').className || ''}`} disabled={running && !isAwaiting('home')} aria-label="Amazon home" onClick={() => act('home')}><img src="/sandbox/amazon-logo.svg" alt="" /></button><div className="az-delivery"><small>Deliver to</small><b>⌖ Demo City 10001</b></div>
       <form className="az-search" onSubmit={e => { e.preventDefault(); act('search-submit'); }}><select aria-label="Search department" value={department} onChange={e => { setDepartment(e.target.value); search(e.target.value === 'All' ? '' : e.target.value); }}><option>All</option><option>Organic</option><option>Fresh</option><option>Coffee</option></select><input {...node('search')} aria-label="Search products" placeholder="Search Amazon" value={s.query} disabled={running} onChange={e => act('search', e.target.value)} /><button {...node('search-submit')} aria-label="Search" disabled={running}>⌕</button></form>
       <span className="az-language">🇺🇸 EN</span><div className="az-account"><small>Hello, guest</small><button type="button" disabled={running} onClick={() => act('wishlist')}>Account & Lists ▾</button></div><div className="az-orders"><small>Returns</small><button type="button" disabled={running} onClick={() => act('orders')}>&amp; Orders</button></div>{control('cart', <><span className="az-cart-icon"><svg viewBox="0 0 40 34" aria-hidden="true"><path d="M2 7h5l4.5 16h20L36 11H9" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" /><circle cx="14" cy="29" r="2.5" fill="currentColor" /><circle cx="29" cy="29" r="2.5" fill="currentColor" /></svg><b className="az-cart-count">{count}</b></span><span>Cart</span></>, 'az-cart')}
     </header>

@@ -17,6 +17,8 @@ export default function SandboxView({ doc }: { doc: PageDoc }) {
   const act = useStore((s) => s.actOnSandbox);
   const setSelection = useStore((s) => s.setSelection);
   const running = useStore((s) => s.guideRun?.running);
+  const pending = useStore((s) => s.pendingConfirm);
+  const resolveConfirm = useStore((s) => s.resolveConfirm);
   const quoraLanguage = useStore((s) => s.sandboxSessions.quora?.language || 'English');
   const root = useRef<HTMLDivElement>(null);
   const guideId = guide?.steps[guide.current]?.id;
@@ -32,19 +34,26 @@ export default function SandboxView({ doc }: { doc: PageDoc }) {
       key: b.id, 'data-node-id': b.id,
       className: `${b.id === guideId ? 'pg-guide' : b.id === focused ? 'pg-visual' : ev ? 'pg-evidence' : ''}`,
     };
-    if (b.type === 'button') return (
-      <button {...attrs} disabled={running} aria-pressed={b.id.startsWith('language-') ? b.text.includes('(') : undefined} onClick={() => act({ type: 'click', id: b.id })}
-        className={`${attrs.className} sandbox-button ${b.id.startsWith('add-') || ['save-language', 'checkout', 'review-order', 'pay-demo', 'post-question', 'submit-answer'].includes(b.id) ? 'sandbox-primary' : ''}`}>
-        {b.text}{marker}
-      </button>
-    );
+    if (b.type === 'button') {
+      // In manual mode, the highlighted step control is clickable to approve/advance the step.
+      const awaiting = !!pending && guideId === b.id;
+      return (
+        <button {...attrs} disabled={running && !awaiting} aria-pressed={b.id.startsWith('language-') ? b.text.includes('(') : undefined}
+          onClick={() => awaiting ? resolveConfirm(true) : act({ type: 'click', id: b.id })}
+          className={`${attrs.className} sandbox-button ${b.id.startsWith('add-') || ['save-language', 'checkout', 'review-order', 'pay-demo', 'post-question', 'submit-answer'].includes(b.id) ? 'sandbox-primary' : ''}`}>
+          {b.text}{marker}
+        </button>
+      );
+    }
     if (b.type === 'input') {
       const style = `${attrs.className} w-full rounded-lg border border-[#d8d8d8] bg-white px-3 py-2.5 text-base text-[#252525] outline-orange`;
       return <label key={b.id} className={b.id === 'search' ? 'min-w-[160px] flex-1' : 'my-2 block w-full'}>
         {b.id !== 'search' && <span className="mb-1 block text-sm font-medium text-[#555]">{b.text}</span>}
-        {b.multiline ? <textarea {...attrs} aria-label={b.text} rows={4} placeholder={b.text} value={b.value || ''} disabled={running}
+        {b.multiline ? <textarea {...attrs} aria-label={b.text} rows={4} placeholder={b.text} value={b.value || ''} disabled={running && !(pending && guideId === b.id)}
+          onClick={() => { if (pending && guideId === b.id) resolveConfirm(true); }}
           onChange={(e) => act({ type: 'fill', id: b.id, value: e.target.value })} className={style} />
-          : <input {...attrs} type={b.id === 'search' ? 'search' : 'text'} aria-label={b.text} placeholder={b.text} value={b.value || ''} disabled={running}
+          : <input {...attrs} type={b.id === 'search' ? 'search' : 'text'} aria-label={b.text} placeholder={b.text} value={b.value || ''} disabled={running && !(pending && guideId === b.id)}
+            onClick={() => { if (pending && guideId === b.id) resolveConfirm(true); }}
             onChange={(e) => act({ type: 'fill', id: b.id, value: e.target.value })}
             onKeyDown={(e) => { if (e.key === 'Enter' && b.id === 'search') act({ type: 'click', id: 'search-submit' }); }} className={style} />}
       </label>;
@@ -83,7 +92,7 @@ export default function SandboxView({ doc }: { doc: PageDoc }) {
           <header className="quora-header">
             <div className="quora-header-inner">
               <strong className="quora-logo">Quora</strong>
-              <nav aria-label={t('Quora navigation')} className="quora-icons"><button type="button" data-node-id="home" aria-label={t('Home feed')} className={quoraHome ? 'active' : ''} disabled={running} onClick={() => act({ type: 'click', id: 'home' })}>⌂</button><span>▤</span><span>✎</span><span>♙</span><span>♧</span></nav>
+              <nav aria-label={t('Quora navigation')} className="quora-icons"><button type="button" data-node-id="home" aria-label={t('Home feed')} className={`${quoraHome ? 'active' : ''} ${guideId === 'home' ? 'pg-guide' : ''}`} disabled={running && !(pending && guideId === 'home')} onClick={() => act({ type: 'click', id: 'home' })}>⌂</button><span>▤</span><span>✎</span><span>♙</span><span>♧</span></nav>
               <div className="quora-search">{search && render(search)}{searchSubmit && render(searchSubmit)}</div>
               <span className="quora-plus">{t('Try Quora+')}</span>
               <span className="quora-profile">🍊</span><span className="quora-globe">◎</span>

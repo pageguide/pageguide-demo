@@ -6,6 +6,12 @@ import { useStore, type GuideRun } from '@/lib/store';
 import type { Evidence, PageSelection } from '@/lib/types';
 import { evidenceForAnswer } from '@/lib/evidence';
 
+const MODES = [
+  { id: 'find', label: 'Find', desc: 'Answer a question about this page, with the sources highlighted. Read-only — takes no actions.' },
+  { id: 'auto', label: 'Auto', desc: 'Let the agent complete a task on this page automatically, performing each step itself.' },
+  { id: 'manual', label: 'Manual', desc: 'Follow the on-page arrow and click each highlighted control to advance one step at a time.' },
+] as const;
+
 export default function SidePanel() {
   const {
     settings,
@@ -26,14 +32,18 @@ export default function SidePanel() {
     scratchpad,
     pendingConfirm,
     resolveConfirm,
+    uiMode,
+    setUiMode,
   } = useStore();
+  const [modeMenu, setModeMenu] = useState(false);
+  const [modeInfo, setModeInfo] = useState(false);
   const [input, setInput] = useState('');
   const [adminNotice, setAdminNotice] = useState('');
   const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
-  }, [messages, guideRun]);
+  }, [messages, guideRun, pendingConfirm]);
 
   const usages = messages.flatMap((m) => m.result?.usage ? [m.result.usage] : []);
   const tokens = usages.reduce((sum, usage) => sum + usage.total, 0);
@@ -41,10 +51,18 @@ export default function SidePanel() {
   const costUnknown = usages.some((usage) => usage.cost === null);
   const estimated = usages.some((usage) => usage.estimated);
 
+  const pickMode = (m: 'find' | 'auto' | 'manual') => { setUiMode(m); setModeMenu(false); setModeInfo(false); if (input.trim() === '/') setInput(''); };
+
   const submit = () => {
     const t = input.trim();
     if (!t || busy) return;
+    // "/" alone opens the mode menu instead of sending.
+    if (t === '/') { setModeMenu(true); return; }
+    // Quick mode switch: /find, /auto, /manual.
+    const modeCmd = t.match(/^\/(find|auto|manual)\b/i);
+    if (modeCmd) { pickMode(modeCmd[1].toLowerCase() as 'find' | 'auto' | 'manual'); setInput(''); return; }
     setInput('');
+    setModeMenu(false);
     // Keep admin access without adding another toolbar button or sending credentials to the model.
     if (/^\/admin(?:\s|$)/i.test(t)) {
       const password = t.replace(/^\/admin\s*/i, '');
@@ -60,7 +78,7 @@ export default function SidePanel() {
     if (/^\/open\s+/i.test(t)) return void loadUrl(t);
     if (/^\/search\s+/i.test(t)) return void search(t);
     if (/^\/clear\b/i.test(t)) return clearChat();
-    void ask(t);
+    void ask(t, uiMode === 'find' ? 'find' : 'guide');
   };
 
   return (
@@ -98,16 +116,20 @@ export default function SidePanel() {
         ))}
         {guideRun && <GuideCard key={`run-${guideRun.id}`} run={guideRun} scratchpad={scratchpad} />}
         {pendingConfirm && (
-          <div role="alertdialog" aria-label="Confirm action" className="rounded-2xl border-2 border-orange bg-white px-4 py-3 shadow-soft dark:border-orange dark:bg-night-panel">
+          <div role="alertdialog" aria-label={pendingConfirm.mode === 'step' ? 'Next step' : 'Confirm action'} className="rounded-2xl border-2 border-orange bg-white px-4 py-3 shadow-soft dark:border-orange dark:bg-night-panel">
             <div className="flex items-center gap-2 text-sm font-semibold text-[#a85024] dark:text-orange">
-              <span aria-hidden="true">⚠</span> {pendingConfirm.title}
+              <span aria-hidden="true">{pendingConfirm.mode === 'step' ? '→' : '⚠'}</span> {pendingConfirm.title}
             </div>
-            <p className="mt-1.5 text-sm leading-relaxed text-muted dark:text-night-muted">{pendingConfirm.detail}</p>
-            <p className="mt-2 text-sm text-ink dark:text-night-ink">Step: <span className="italic">“{pendingConfirm.instruction}”</span></p>
-            <p className="mt-1 text-xs text-muted dark:text-night-muted">This action can’t be undone. Approve to let the agent continue, or deny to stop here.</p>
+            <p className="mt-2 text-sm text-ink dark:text-night-ink"><span className="italic">“{pendingConfirm.instruction}”</span></p>
+            <p className="mt-1.5 text-xs leading-relaxed text-muted dark:text-night-muted">
+              {pendingConfirm.detail}
+              {pendingConfirm.mode === 'step'
+                ? ' The target is highlighted on the page.'
+                : ' This action can’t be undone.'}
+            </p>
             <div className="mt-3 flex gap-2">
-              <button onClick={() => resolveConfirm(true)} className="flex-1 rounded-xl bg-orange px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange">Approve</button>
-              <button onClick={() => resolveConfirm(false)} className="flex-1 rounded-xl border border-line px-4 py-2.5 text-sm font-semibold text-ink transition hover:bg-orange-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange dark:border-night-line dark:text-night-ink dark:hover:bg-white/5">Deny</button>
+              <button onClick={() => resolveConfirm(true)} className="flex-1 rounded-xl bg-orange px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange">{pendingConfirm.mode === 'step' ? 'Do this step' : 'Approve'}</button>
+              <button onClick={() => resolveConfirm(false)} className="flex-1 rounded-xl border border-line px-4 py-2.5 text-sm font-semibold text-ink transition hover:bg-orange-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange dark:border-night-line dark:text-night-ink dark:hover:bg-white/5">{pendingConfirm.mode === 'step' ? 'Stop' : 'Deny'}</button>
             </div>
           </div>
         )}
@@ -146,8 +168,9 @@ export default function SidePanel() {
           <textarea
             suppressHydrationWarning
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => { const v = e.target.value; setInput(v); setModeMenu(v.trim() === '/'); if (v) setModeInfo(false); }}
             onKeyDown={(e) => {
+              if (e.key === 'Escape') { setModeMenu(false); setModeInfo(false); return; }
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 submit();
@@ -155,10 +178,40 @@ export default function SidePanel() {
             }}
             rows={3}
             aria-label="Message PageGuide"
-            placeholder="Ask PageGuide…"
+            placeholder="Ask PageGuide…  (type / to pick a mode)"
             className="composer-input min-h-[84px] w-full resize-none overflow-y-auto bg-transparent text-base leading-7 text-ink outline-none placeholder:text-muted dark:text-night-ink dark:placeholder:text-night-muted"
           />
-          <div className="mt-1 flex items-center justify-end">
+          <div className="relative mt-1 flex items-center justify-between gap-2">
+            {(modeMenu || modeInfo) && (
+              <div className="absolute bottom-full left-0 z-30 mb-2 w-72 rounded-2xl border border-line bg-white p-1.5 shadow-panel dark:border-night-line dark:bg-night-panel" role="listbox" aria-label="Choose a mode">
+                <p className="px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-orange">{modeMenu ? 'Choose a mode' : 'What the modes do'}</p>
+                {MODES.map((m) => (
+                  <button key={m.id} type="button" onClick={() => pickMode(m.id)} role="option" aria-selected={uiMode === m.id}
+                    className={`block w-full rounded-xl px-3 py-2 text-left transition-colors hover:bg-orange-soft dark:hover:bg-white/5 ${uiMode === m.id ? 'bg-orange-soft dark:bg-white/5' : ''}`}>
+                    <span className="flex items-center gap-1.5 text-sm font-semibold text-ink dark:text-night-ink">{m.label}{uiMode === m.id && <span className="text-[10px] font-medium text-orange">· current</span>}</span>
+                    <span className="mt-0.5 block text-xs leading-relaxed text-muted dark:text-night-muted">{m.desc}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-1.5">
+              <div role="group" aria-label="Mode" className="flex items-center rounded-full border border-line p-0.5 text-xs font-medium dark:border-night-line">
+                {MODES.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => pickMode(m.id)}
+                    aria-pressed={uiMode === m.id}
+                    title={m.desc}
+                    className={`rounded-full px-2.5 py-1 transition-colors ${uiMode === m.id ? 'bg-orange text-white' : 'text-muted hover:text-ink dark:text-night-muted dark:hover:text-night-ink'}`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+              <button type="button" aria-label="What do the modes mean?" aria-expanded={modeInfo} onClick={() => { setModeInfo((o) => !o); setModeMenu(false); }}
+                className="flex h-6 w-6 items-center justify-center rounded-full border border-line text-[11px] font-bold text-muted transition-colors hover:text-ink dark:border-night-line dark:text-night-muted dark:hover:text-night-ink">ⓘ</button>
+            </div>
             <button
               onClick={submit}
               disabled={busy || !input.trim()}

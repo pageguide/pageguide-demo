@@ -5,6 +5,7 @@ import PageView from '@/components/PageView';
 import SidePanel from '@/components/SidePanel';
 import LibraryShelf, { SANDBOX_TASKS } from '@/components/LibraryShelf';
 import SandboxView from '@/components/SandboxView';
+import GuidePointer from '@/components/GuidePointer';
 import type { Block } from '@/lib/types';
 
 export default function ExtensionSurface() {
@@ -119,6 +120,7 @@ export default function ExtensionSurface() {
             />
           )}
         </div>
+        <GuidePointer />
       </div>
 
       {/* side panel column */}

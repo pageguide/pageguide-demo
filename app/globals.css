@@ -167,6 +167,7 @@ body {
 .pg-guide {
   box-shadow: 0 0 0 3px theme('colors.orange.DEFAULT');
   background: #fff6ee !important;
+  color: #513524 !important; /* keep a readable text color when a control (e.g. a white-on-red tab) is highlighted */
   border-radius: 6px;
   scroll-margin: 100px;
 }
@@ -184,6 +185,7 @@ body {
 }
 .dark .pg-guide {
   background: #3a2c1f !important;
+  color: #ffe1cb !important;
 }
 
 /* thin scrollbars */
