@@ -48,7 +48,8 @@ test('Guide completes demo payment and saves the actual paid-order confirmation'
   await expect(saved.getByRole('button', { name: 'Saved evidence (1)', exact: true })).toHaveAttribute('aria-expanded', 'false');
   // The inline answer citation remains available without opening the gallery.
   await expect(page.getByRole('button', { name: 'Screenshot evidence 1', exact: true })).toBeVisible();
-  await expect(page.getByTestId('verification-result')).toContainText('Verified');
+  await expect(page.getByTestId('verification-result')).toHaveCount(0);
+  await expect(page.getByTestId('guide-status')).toHaveClass(/border-green-600/);
 });
 
 test('checkout verification distinguishes reviewing from paying and rejects duplicate payment', () => {
