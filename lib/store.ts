@@ -55,6 +55,7 @@ export interface ChatMessage {
   error?: boolean;
   action?: boolean; // an "agent did X" log line
   selection?: PageSelection;
+  guide?: { run: GuideRun; scratchpad: Evidence[] }; // a finished Guide run persisted into the log
 }
 
 export interface GuideState {
@@ -497,7 +498,10 @@ export const useStore = create<StoreState>((set, get) => ({
       } catch (e: unknown) {
         const cur = get().guideRun;
         const msg = e instanceof Error ? e.message : 'The agent failed.';
-        if (cur?.id === id) set({ guideRun: { ...cur, running: false, final: { status: 'Failed', answer: msg, reasoning: '' } } });
+        if (cur?.id === id) {
+          const finalRun: GuideRun = { ...cur, running: false, final: { status: 'Failed', answer: msg, reasoning: '' } };
+          set({ messages: [...get().messages, { id: msgId++, role: 'assistant', mode: 'guide', text: msg, guide: { run: finalRun, scratchpad: get().scratchpad } }], guideRun: null, scratchpad: [] });
+        }
       } finally {
         if (get().guideRun?.id === id) set({ busy: false });
       }
@@ -605,13 +609,22 @@ export const useStore = create<StoreState>((set, get) => ({
       doc?.title ||
       (messages.find((m) => m.role === 'user')?.text ?? 'Chat').slice(0, 60) ||
       'Chat';
+    // Drop heavy base64 screenshots from persisted Guide runs; keep the trajectory + answer.
+    const lightMessages = messages.map((m) =>
+      m.guide
+        ? { ...m, guide: {
+            run: { ...m.guide.run, journey: m.guide.run.journey.map((j) => ({ ...j, screenshot: undefined })) },
+            scratchpad: m.guide.scratchpad.map((e) => ({ ...e, imageUrl: '' })),
+          } }
+        : m,
+    );
     const chat: SavedChat = {
       id: `c${Date.now()}`,
       title,
       savedAt: Date.now(),
       url: doc?.url || query || null,
       doc: doc ? { ...doc, html: undefined } : null, // don't persist heavy page HTML
-      messages,
+      messages: lightMessages,
     };
     const next = [chat, ...history].slice(0, 30);
     persistHistory(next);
@@ -904,10 +917,14 @@ async function runAgent(
   if (!alive()) return;
   const run = get().guideRun!;
   const citedEvidence = selected.filter((e) => finalAnswer.includes(`[EV:${e.name}]`));
+  const finalRun: GuideRun = { ...run, running: false, final: { status, answer: finalAnswer, reasoning: '', verification: verified } };
+  // Persist the finished run into the chat log (like a Find answer) and retire the live card.
   set({
     evidence: citedEvidence.flatMap((e) => e.targetId ? [{ id: e.targetId, marker: String(e.index), annotation: e.annotation }] : []),
     focusedEvidence: null,
-    guideRun: { ...run, running: false, final: { status, answer: finalAnswer, reasoning: '', verification: verified } },
+    messages: [...get().messages, { id: msgId++, role: 'assistant', mode: 'guide', text: finalAnswer, guide: { run: finalRun, scratchpad: selected } }],
+    guideRun: null,
+    scratchpad: [],
   });
 }
 

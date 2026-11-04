@@ -24,12 +24,10 @@ export default function SidePanel() {
     lockAdmin,
     guideRun,
     scratchpad,
-    toggleJourney,
     pendingConfirm,
     resolveConfirm,
   } = useStore();
   const [input, setInput] = useState('');
-  const [openEv, setOpenEv] = useState<string | null>(null);
   const [adminNotice, setAdminNotice] = useState('');
   const logRef = useRef<HTMLDivElement>(null);
 
@@ -74,7 +72,7 @@ export default function SidePanel() {
           <IconBtn label={settings.dark ? 'Light mode' : 'Dark mode'} onClick={toggleDark}>
             {settings.dark ? '☀' : '☾'}
           </IconBtn>
-          <IconBtn label="Clear chat" onClick={() => { clearChat(); setOpenEv(null); setAdminNotice(''); }}>
+          <IconBtn label="Clear chat" onClick={() => { clearChat(); setAdminNotice(''); }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
               <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7M14 10v7" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
@@ -94,18 +92,11 @@ export default function SidePanel() {
           </div>
         )}
         {messages.map((m) => (
-          <Message key={m.id} m={m} />
+          m.guide
+            ? <GuideCard key={m.id} run={m.guide.run} scratchpad={m.guide.scratchpad} />
+            : <Message key={m.id} m={m} />
         ))}
-        {guideRun && (
-          <GuideCard
-            key={guideRun.id}
-            run={guideRun}
-            scratchpad={scratchpad}
-            openEv={openEv}
-            setOpenEv={setOpenEv}
-            onToggleJourney={toggleJourney}
-          />
-        )}
+        {guideRun && <GuideCard key={`run-${guideRun.id}`} run={guideRun} scratchpad={scratchpad} />}
         {pendingConfirm && (
           <div role="alertdialog" aria-label="Confirm action" className="rounded-2xl border-2 border-orange bg-white px-4 py-3 shadow-soft dark:border-orange dark:bg-night-panel">
             <div className="flex items-center gap-2 text-sm font-semibold text-[#a85024] dark:text-orange">
@@ -197,16 +188,12 @@ export default function SidePanel() {
 function GuideCard({
   run,
   scratchpad,
-  openEv,
-  setOpenEv,
-  onToggleJourney,
 }: {
   run: GuideRun;
   scratchpad: Evidence[];
-  openEv: string | null;
-  setOpenEv: (n: string | null) => void;
-  onToggleJourney: () => void;
 }) {
+  const [openEv, setOpenEv] = useState<string | null>(null);
+  const [journeyOpen, setJourneyOpen] = useState(true);
   const [openStep, setOpenStep] = useState<number | null>(null);
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const evidenceId = useId();
@@ -228,10 +215,10 @@ function GuideCard({
           <div className="text-base font-semibold text-ink dark:text-night-ink">{run.task}</div>
 
         </div>
-        <button aria-label="View Journey" aria-expanded={run.journeyOpen} onClick={onToggleJourney} className="mt-2 flex min-h-10 items-center gap-1 text-sm font-medium text-muted dark:text-night-muted">
-          <span className={`transition-transform ${run.journeyOpen ? 'rotate-90' : ''}`}>▸</span> View Journey
+        <button aria-label="View Journey" aria-expanded={journeyOpen} onClick={() => setJourneyOpen((o) => !o)} className="mt-2 flex min-h-10 items-center gap-1 text-sm font-medium text-muted dark:text-night-muted">
+          <span className={`transition-transform ${journeyOpen ? 'rotate-90' : ''}`}>▸</span> View Journey
         </button>
-        {run.journeyOpen && (
+        {journeyOpen && (
           <div className="mt-2 space-y-2 border-t border-line pt-2 dark:border-night-line">
             {run.journey.map((j, i) => (
               <div key={i} className="text-sm leading-relaxed">
@@ -277,10 +264,10 @@ function GuideCard({
               <div id={evidenceId} hidden={!evidenceOpen}>
                 {evidenceOpen && <div className="pg-evidence-grid pt-2">
                   {citedEvidence.map((ev) => <div key={ev.name} className="min-w-0 rounded-xl border border-line bg-cream p-2 dark:border-night-line dark:bg-night">
-                    <button onClick={() => setOpenEv(ev.name)} aria-label={`Enlarge screenshot ${ev.index}`} className="block w-full overflow-hidden rounded-lg bg-white">
+                    {ev.imageUrl && <button onClick={() => setOpenEv(ev.name)} aria-label={`Enlarge screenshot ${ev.index}`} className="block w-full overflow-hidden rounded-lg bg-white">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={ev.imageUrl} alt={ev.caption || ev.label || 'Agent-selected evidence'} className="h-28 w-full object-contain" />
-                    </button>
+                    </button>}
                     <div className="mt-2 flex min-w-0 items-start gap-1">
                       <EvidenceBadge ev={ev} onOpen={() => setOpenEv(ev.name)} />
                       <span className="min-w-0 flex-1 text-sm leading-relaxed text-ink dark:text-night-ink">{ev.label || ev.caption}</span>
