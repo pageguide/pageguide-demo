@@ -34,12 +34,20 @@ export default function SidePanel() {
     resolveConfirm,
     uiMode,
     setUiMode,
+    composerDraft,
+    composerFocusRevision,
   } = useStore();
   const [modeMenu, setModeMenu] = useState(false);
   const [modeInfo, setModeInfo] = useState(false);
   const [input, setInput] = useState('');
   const [adminNotice, setAdminNotice] = useState('');
   const logRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    setInput(composerDraft);
+    inputRef.current?.focus();
+  }, [composerDraft, composerFocusRevision]);
 
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
@@ -166,6 +174,7 @@ export default function SidePanel() {
       <div className="shrink-0 px-3 pb-3 pt-1">
         <div className="pg-chat-composer rounded-[28px] border border-white/80 bg-white/90 px-5 pb-3 pt-4 shadow-soft dark:border-white/10 dark:bg-[#29221f]/95">
           <textarea
+            ref={inputRef}
             suppressHydrationWarning
             value={input}
             onChange={(e) => { const v = e.target.value; setInput(v); setModeMenu(v.trim() === '/'); if (v) setModeInfo(false); }}

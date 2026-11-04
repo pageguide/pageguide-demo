@@ -41,6 +41,7 @@ test('Guide completes demo payment and saves the actual paid-order confirmation'
   await page.goto('/');
   await page.getByRole('button', { name: /Amazon sandbox/ }).click();
   await page.getByRole('button', { name: 'Guide: Buy oranges using demo checkout', exact: true }).click();
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
   await expect(page.getByText('Completed', { exact: true })).toBeVisible({ timeout: 25000 });
   await expect(page.locator('[data-node-id="order-confirmation"]')).toContainText('Evidence 1');
   const saved = page.getByRole('region', { name: 'Saved evidence' });

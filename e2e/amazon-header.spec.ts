@@ -59,6 +59,7 @@ test('saved annotations align with a scrolled Amazon page and stay inside the ev
   const site = page.locator('[data-sandbox-root]');
   await site.evaluate(root => { root.scrollTop = 250; });
   await page.getByRole('button', { name: 'Guide: Save coffee to my wishlist', exact: true }).click();
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
   await expect(page.getByTestId('guide-status')).toHaveText('Completed', { timeout: 60000 });
   await expect(site.locator('[data-node-id="wishlist"]')).toHaveCount(1);
   const expected = await site.evaluate(root => {

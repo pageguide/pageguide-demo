@@ -30,6 +30,7 @@ test('answer evidence starts collapsed, excludes intermediate captures, and fits
   await page.goto('/');
   await page.getByRole('button', { name: /Quora sandbox/ }).click();
   await page.getByRole('button', { name: 'Guide: Change my language to Spanish', exact: true }).click();
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
   await expect(page.getByText('Completed', { exact: true })).toBeVisible({ timeout: 20000 });
   const gallery = page.getByRole('region', { name: 'Saved evidence' });
   const toggle = gallery.getByRole('button', { name: 'Saved evidence (1)', exact: true });

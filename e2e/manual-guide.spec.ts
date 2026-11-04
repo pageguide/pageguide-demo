@@ -53,6 +53,7 @@ test('manual callout remains within the browser pane after resize and stops clea
   await page.getByRole('button', { name: /Quora sandbox/ }).click();
   await page.getByRole('button', { name: 'Manual', exact: true }).click();
   await page.getByRole('button', { name: 'Guide: Change my language to Spanish', exact: true }).click();
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
   await expectArrow(page, 'settings');
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 960 });
@@ -75,6 +76,7 @@ test('museum manual arrows target the visible floor selector and clickable SVG g
   await page.getByRole('button', { name: /The Met Map sandbox/ }).click();
   await page.getByRole('button', { name: 'Manual', exact: true }).click();
   await page.getByRole('button', { name: 'Guide: Switch to Floor 2 and open Modern and Contemporary Art', exact: true }).click();
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
   await expectArrow(page, 'floor-2');
   await expect(page.getByLabel('Museum floor')).toBeEnabled();
   await page.getByRole('button', { name: 'Perform highlighted step' }).focus();
@@ -126,6 +128,7 @@ test('manual on-page clicks explicitly approve consequential steps without bypas
   await page.getByRole('textbox', { name: 'Question topic', exact: true }).fill('Gardening');
   await page.getByRole('button', { name: 'Manual', exact: true }).click();
   await page.getByRole('button', { name: 'Guide: Publish a demo question about gardening', exact: true }).click();
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
   await expectArrow(page, 'post-question');
   await expect(page.getByRole('alertdialog', { name: 'Confirm action', exact: true })).toBeVisible();
   await expect(page.locator('[data-sandbox-root] [data-node-id="page-title"]')).toHaveText('Ask the community');
@@ -140,6 +143,7 @@ test('auto mode never shows a manual arrow', async ({ page }) => {
   await page.getByRole('button', { name: /Amazon sandbox/ }).click();
   await page.getByRole('button', { name: 'Auto', exact: true }).click();
   await page.getByRole('button', { name: 'Guide: Add oranges to my cart', exact: true }).click();
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
   await expect(page.getByTestId('guide-status')).toHaveText('Completed', { timeout: 30000 });
   await expect(page.locator('[data-guide-pointer]')).toHaveCount(0);
 });
