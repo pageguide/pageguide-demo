@@ -1,4 +1,5 @@
 import type { Block, PageDoc } from './types';
+import { verifyManualTask } from './manual-task-verification';
 import type { Answer, Comment, Library, Post } from './library';
 import { TRACKS, ROOMS, AMENITIES } from './sandbox-media';
 import { MET_PLACES, placesForAmenity, amenityKey, floorLabel } from './met-places';
@@ -242,10 +243,10 @@ export function applySandboxAction(s: SandboxState, action: BrowserAction, lib: 
     else if (n.site === 'met-map' && id === 'zoom-out') n.mapZoom = Math.max(.75, (s.mapZoom || 1) - .25);
     else if (n.site === 'met-map' && id === 'reset-map') n.mapZoom = 1;
     else if (n.site === 'met-map' && id === 'close-room') { n.selected = ''; n.mapPlace = ''; n.mapRouting = false; }
-    else if (n.site === 'met-map' && id === 'directions') n.mapRouting = !s.mapRouting;
+    else if (n.site === 'met-map' && id === 'directions') { n.view = 'map'; n.mapRouting = !s.mapRouting; }
     else if (n.site === 'met-map' && id === 'clear-map-search') { n.query = ''; n.mapAmenity = ''; n.mapPlace = ''; n.mapRouting = false; }
-    else if (n.site === 'met-map' && id.startsWith('amenity-')) { n.mapAmenity = s.mapAmenity === id.slice(8) ? '' : id.slice(8); n.query = AMENITIES.find(a => amenityKey(a) === n.mapAmenity) || ''; n.selected = ''; n.mapPlace = ''; n.mapRouting = false; }
-    else if (n.site === 'met-map' && id.startsWith('place-')) { const place = MET_PLACES.find(p => p.id === id.slice(6))!; n.mapPlace = place.id; n.selected = ''; n.mapRouting = false; if (place.floor === 1 || place.floor === 2) n.mapFloor = place.floor; n.mapZoom = Math.max(1.25, s.mapZoom || 1); }
+    else if (n.site === 'met-map' && id.startsWith('amenity-')) { n.view = 'map'; n.mapAmenity = s.mapAmenity === id.slice(8) ? '' : id.slice(8); n.query = AMENITIES.find(a => amenityKey(a) === n.mapAmenity) || ''; n.selected = ''; n.mapPlace = ''; n.mapRouting = false; }
+    else if (n.site === 'met-map' && id.startsWith('place-')) { const place = MET_PLACES.find(p => p.id === id.slice(6))!; n.view = 'map'; n.mapPlace = place.id; n.selected = ''; n.mapRouting = false; if (place.floor === 1 || place.floor === 2) n.mapFloor = place.floor; n.mapZoom = Math.max(1.25, s.mapZoom || 1); }
     else if (n.site === 'met-map' && id.startsWith('room-')) { n.selected = id.slice(5); n.mapPlace = ''; n.view = 'map'; n.mapRouting = false; n.notice = 'Gallery selected on the museum map.'; }
     else if (['cart', 'orders', 'wishlist', 'bookmarks'].includes(id)) n.view = id as SandboxState['view'];
     else if (id === 'settings') { n.view = 'settings'; n.draftLanguage = s.language; }
@@ -295,6 +296,8 @@ export function applySandboxAction(s: SandboxState, action: BrowserAction, lib: 
 }
 
 export function verifySandboxTask(task: string, s: SandboxState, lib: Library, initial?: SandboxState): { supported: boolean; completed: boolean; answer: string; reason: string } {
+  const manualVerdict = verifyManualTask(task, s, lib, initial);
+  if (manualVerdict) return manualVerdict;
   const checks: { passed: boolean; result: string; missing: string }[] = [];
   const mentioned = lib.products.filter((p) => new RegExp(`\\b${p.id.replace(/s$/, '')}s?\\b`, 'i').test(task));
   const paying = /\b(buy|purchase|pay|place an order|complete.{0,15}checkout|check out)\b/i.test(task);

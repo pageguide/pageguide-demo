@@ -3,9 +3,10 @@
 import { useStore } from '@/lib/store';
 import PageView from '@/components/PageView';
 import SidePanel from '@/components/SidePanel';
-import LibraryShelf, { SANDBOX_TASKS } from '@/components/LibraryShelf';
+import LibraryShelf from '@/components/LibraryShelf';
 import SandboxView from '@/components/SandboxView';
 import GuidePointer from '@/components/GuidePointer';
+import SandboxTaskBar from '@/components/SandboxTaskBar';
 import type { Block } from '@/lib/types';
 
 export default function ExtensionSurface() {
@@ -30,9 +31,6 @@ export default function ExtensionSurface() {
     setSelection,
     focusEvidence,
     showLibrary,
-    resetSandbox,
-    ask,
-    busy,
   } = useStore();
   const location = browserView === 'empty' ? 'PageGuide library' : browserView === 'loading' ? query : browserView === 'results' ? `Search: ${query}` : doc?.url || 'PageGuide library';
 
@@ -84,12 +82,7 @@ export default function ExtensionSurface() {
           {doc && <button aria-label="Refresh page" title="Refresh page" onClick={() => void loadUrl(doc.url, { push: false, refresh: true })} className="px-1 text-xl text-muted">↻</button>}
         </div>
 
-        {doc?.sandbox && browserView === 'page' && (
-          <div className="pg-scroll flex shrink-0 items-center gap-2 overflow-x-auto border-b border-orange-ring bg-orange-soft/50 px-3 py-2 dark:border-night-line dark:bg-night">
-            {SANDBOX_TASKS[doc.sandbox].map((task) => <button key={task} disabled={busy} onClick={() => void ask(task, 'guide')} className="shrink-0 whitespace-nowrap rounded-full border border-orange-ring bg-white px-3 py-1.5 text-xs text-[#885029] disabled:opacity-50 dark:border-night-line dark:bg-night-panel dark:text-orange">Guide: {task}</button>)}
-            <button onClick={resetSandbox} className="ml-auto shrink-0 whitespace-nowrap px-2 py-1 text-xs text-muted dark:text-night-muted">Reset sandbox</button>
-          </div>
-        )}
+        {doc?.sandbox && browserView === 'page' && <SandboxTaskBar site={doc.sandbox} />}
         {doc && !doc.sandbox && browserView === 'page' && <p className="border-b border-line px-3 py-2 text-xs text-muted dark:border-night-line dark:text-night-muted">{doc.saved ? `Original website HTML · saved ${doc.savedAt ? new Date(doc.savedAt).toLocaleDateString() : 'locally'} · scripts disabled` : 'External snapshot · links and text fields work; site scripts and form submissions are disabled'}</p>}
         {/* body */}
         <div data-pageguide-page className="min-h-0 flex-1">
