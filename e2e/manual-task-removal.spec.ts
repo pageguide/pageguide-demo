@@ -15,5 +15,9 @@ for (const site of ['Amazon', 'Quora', 'SoundCloud', 'The Met Map']) {
     const manual = page.getByRole('button', { name: 'Manual', exact: true });
     await manual.click();
     await expect(manual).toHaveAttribute('aria-pressed', 'true');
+    await bar.getByRole('button', { name: /^Guide:/ }).first().click();
+    await expect(page.getByRole('textbox', { name: 'Message PageGuide' })).toHaveValue(/.+/);
+    await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeEnabled();
+    await expect(page.locator('[data-guide-pointer]')).toHaveCount(0);
   });
 }

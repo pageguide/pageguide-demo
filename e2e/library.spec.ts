@@ -68,6 +68,7 @@ test('agent receives fresh Quora state, saves only selected evidence, and attach
   await page.goto('/');
   await page.getByRole('button', { name: /Quora sandbox/ }).click();
   await page.getByRole('button', { name: 'Guide: Change my language to Spanish', exact: true }).click();
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
   await expect(page.getByText('Completed', { exact: true })).toBeVisible({ timeout: 20000 });
   const saved = page.getByRole('region', { name: 'Saved evidence' });
   await expect(saved.locator('img')).toHaveCount(0);
@@ -87,6 +88,7 @@ test('a premature finish cannot falsely complete the task', async ({ page }) => 
   await page.goto('/');
   await page.getByRole('button', { name: /Amazon sandbox/ }).click();
   await page.getByRole('button', { name: 'Guide: Add oranges to my cart', exact: true }).click();
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
   await expect(page.getByText('Incomplete', { exact: true })).toBeVisible({ timeout: 15000 });
   await expect(page.getByText('Completed', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Saved evidence' })).toHaveCount(0);
@@ -104,6 +106,7 @@ test('clear chat cancels an in-flight agent action', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: /Amazon sandbox/ }).click();
   await page.getByRole('button', { name: 'Guide: Add oranges to my cart', exact: true }).click();
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
   await expect.poll(() => requested).toBe(true);
   await page.getByRole('button', { name: 'Clear chat', exact: true }).click();
   release();

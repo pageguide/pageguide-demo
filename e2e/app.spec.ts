@@ -78,6 +78,7 @@ test('Guide acts on the real sandbox state and shows both screenshots and on-pag
   });
   await expect(page.getByRole('complementary', { name: 'Selected text context' })).toBeVisible();
   await page.getByRole('button', { name: 'Guide: Add oranges to my cart', exact: true }).click();
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
   await expect(page.getByText('Completed', { exact: true })).toBeVisible({ timeout: 20000 });
   await expect(page.getByText('Reasoning Trail')).toHaveCount(0);
   await expect(page.getByText('Saved evidence (2)')).toBeVisible();

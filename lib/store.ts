@@ -36,6 +36,7 @@ export interface GuideRun {
 
 export type Surface = 'browser' | 'terminal';
 export type BrowserView = 'empty' | 'loading' | 'results' | 'page';
+export type UiMode = 'find' | 'auto' | 'manual';
 
 export interface Settings {
   provider: Provider;
@@ -86,7 +87,9 @@ interface StoreState {
   focusedEvidence: string | null; // the one the user clicked (shown stronger)
   guide: GuideState | null;
   guideRun: GuideRun | null; // the autonomous Guide run (task card + journey + answer)
-  uiMode: 'find' | 'auto' | 'manual'; // find = answer with sources; auto = agent runs the task; manual = user approves each step
+  uiMode: UiMode; // find = answer with sources; auto = agent runs the task; manual = user approves each step
+  composerDraft: string;
+  composerFocusRevision: number;
   pendingConfirm: { mode: 'risk' | 'step'; kind: string; label: string; title: string; detail: string; instruction: string } | null; // an action awaiting user approval
   scratchpad: Evidence[]; // named evidence saved during the run
   fieldValues: Record<string, string>;
@@ -129,7 +132,9 @@ interface StoreState {
   toggleReasoning: () => void;
   closeGuideRun: () => void;
   resolveConfirm: (ok: boolean) => void;
-  setUiMode: (m: 'find' | 'auto' | 'manual') => void;
+  setUiMode: (m: UiMode) => void;
+  setComposerDraft: (text: string) => void;
+  stageExampleRequest: (text: string, mode: UiMode) => boolean;
 
   saveChat: () => void;
   loadChat: (id: string) => void;
@@ -239,6 +244,8 @@ export const useStore = create<StoreState>((set, get) => ({
   guide: null,
   guideRun: null,
   uiMode: 'find',
+  composerDraft: '',
+  composerFocusRevision: 0,
   pendingConfirm: null,
   scratchpad: [],
   fieldValues: {},
@@ -679,10 +686,18 @@ export const useStore = create<StoreState>((set, get) => ({
   closeGuideRun: () => { agentAbort?.abort(); set({ guideRun: null, scratchpad: [], guide: null, pendingConfirm: null, busy: false }); },
   resolveConfirm: (ok) => { confirmResolver?.(ok); },
   setUiMode: (m) => set({ uiMode: m }),
+  setComposerDraft: (text) => set({ composerDraft: text }),
+  stageExampleRequest: (text, mode) => {
+    if (get().busy || get().guideRun?.running) return false;
+    // Selection only prepares an editable request. Only the composer's Send/Enter
+    // handler may submit it, regardless of the chosen channel.
+    set({ composerDraft: text, uiMode: mode, composerFocusRevision: get().composerFocusRevision + 1 });
+    return true;
+  },
 
   clearChat: () => {
     agentAbort?.abort();
-    set({ messages: [], selection: null, evidence: [], focusedEvidence: null, guide: null, guideRun: null, scratchpad: [], fieldValues: {}, clicked: [], busy: false });
+    set({ messages: [], composerDraft: '', selection: null, evidence: [], focusedEvidence: null, guide: null, guideRun: null, scratchpad: [], fieldValues: {}, clicked: [], busy: false });
   },
   reset: () => {
     navigationAbort?.abort();
@@ -699,6 +714,7 @@ export const useStore = create<StoreState>((set, get) => ({
       navStack: [],
       navIndex: -1,
       messages: [],
+      composerDraft: '',
       evidence: [],
       focusedEvidence: null,
       guide: null,
