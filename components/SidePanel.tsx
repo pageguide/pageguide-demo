@@ -198,12 +198,10 @@ function GuideCard({
   const stepEvidence = (i: number): Evidence => ({ name: `journey-step-${i}`, label: i === 0 ? 'Initial state' : `Step ${i}`, index: i, imageUrl: run.journey[i].screenshot!, caption: run.journey[i].instruction, capturedAt: run.journey[i].capturedAt });
   const dot = (s: string) =>
     s === 'done' ? 'bg-sage' : s === 'failed' ? 'bg-red-500' : s === 'running' ? 'bg-orange animate-pulse' : 'bg-line dark:bg-night-line';
-  const statusPill =
-    run.final?.status === 'Completed'
-      ? 'border-sage text-sage'
-      : run.final?.status === 'Failed'
-        ? 'border-[#c08457] text-[#9b6443]'
-        : 'border-line text-muted';
+  // Verification stays internal; only a genuinely verified completion gets a green badge.
+  const statusPill = run.final?.status === 'Completed' && run.final.verification?.completed === true
+    ? 'border-green-600 bg-green-50 text-green-700 dark:border-green-400 dark:bg-green-950 dark:text-green-300'
+    : 'border-gray-300 bg-gray-100 text-gray-600 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300';
   const current = run.journey.find((j) => j.status === 'running');
 
   return (
@@ -243,16 +241,13 @@ function GuideCard({
         <div className="min-w-0 max-w-full rounded-xl border border-orange-ring bg-white px-3 py-2.5 dark:border-night-line dark:bg-night-panel">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wide text-orange">Answer</span>
-            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusPill}`}>
+            <span data-testid="guide-status" className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusPill}`}>
               {run.final.status}
             </span>
           </div>
           <p className="mt-2 text-base leading-7 text-ink dark:text-night-ink">
             {renderAnswerWithEvidence(run.final.answer, scratchpad, setOpenEv)}
           </p>
-          {run.final.verification && <p data-testid="verification-result" className="mt-3 rounded-lg bg-orange-soft/50 px-3 py-2 text-xs leading-relaxed text-[#885532] dark:bg-white/5 dark:text-orange">
-            {run.final.verification.completed ? 'Verified' : run.final.verification.source === 'unavailable' ? 'Verification unavailable' : 'Not complete'} · {run.final.verification.reason}
-          </p>}
           {citedEvidence.length > 0 && (
             <section aria-label="Saved evidence" className="mt-4 min-w-0 border-t border-orange-ring pt-2 dark:border-night-line">
               <button aria-expanded={evidenceOpen} aria-controls={evidenceId} onClick={() => setEvidenceOpen((open) => !open)}

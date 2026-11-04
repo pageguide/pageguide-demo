@@ -50,7 +50,9 @@ for (const outcome of ['completed', 'unmet', 'unavailable'] as const) {
     await page.getByRole('button', { name: 'Send', exact: true }).click();
     await expect(page.getByRole('button', { name: 'View Journey', exact: true })).toHaveAttribute('aria-expanded', 'true');
     await expect(page.getByText(outcome === 'completed' ? 'Completed' : 'Incomplete', { exact: true })).toBeVisible({ timeout: 20000 });
-    await expect(page.getByTestId('verification-result')).toContainText(outcome === 'completed' ? 'Verified' : outcome === 'unmet' ? 'comparison is not present' : 'Verification unavailable');
+    await expect(page.getByTestId('verification-result')).toHaveCount(0);
+    await expect(page.getByTestId('guide-status')).toHaveClass(outcome === 'completed' ? /border-green-600/ : /border-gray-300/);
+    await expect(page.getByTestId('guide-status')).not.toContainText(/Verified|Verification/);
     await expect(page.getByRole('button', { name: 'View step 1: Read the Fetch API overview.', exact: true })).toBeVisible();
   });
 }
