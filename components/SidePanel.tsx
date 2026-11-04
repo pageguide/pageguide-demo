@@ -25,6 +25,8 @@ export default function SidePanel() {
     guideRun,
     scratchpad,
     toggleJourney,
+    pendingConfirm,
+    resolveConfirm,
   } = useStore();
   const [input, setInput] = useState('');
   const [openEv, setOpenEv] = useState<string | null>(null);
@@ -103,6 +105,20 @@ export default function SidePanel() {
             setOpenEv={setOpenEv}
             onToggleJourney={toggleJourney}
           />
+        )}
+        {pendingConfirm && (
+          <div role="alertdialog" aria-label="Confirm action" className="rounded-2xl border-2 border-orange bg-white px-4 py-3 shadow-soft dark:border-orange dark:bg-night-panel">
+            <div className="flex items-center gap-2 text-sm font-semibold text-[#a85024] dark:text-orange">
+              <span aria-hidden="true">⚠</span> {pendingConfirm.title}
+            </div>
+            <p className="mt-1.5 text-sm leading-relaxed text-muted dark:text-night-muted">{pendingConfirm.detail}</p>
+            <p className="mt-2 text-sm text-ink dark:text-night-ink">Step: <span className="italic">“{pendingConfirm.instruction}”</span></p>
+            <p className="mt-1 text-xs text-muted dark:text-night-muted">This action can’t be undone. Approve to let the agent continue, or deny to stop here.</p>
+            <div className="mt-3 flex gap-2">
+              <button onClick={() => resolveConfirm(true)} className="flex-1 rounded-xl bg-orange px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange">Approve</button>
+              <button onClick={() => resolveConfirm(false)} className="flex-1 rounded-xl border border-line px-4 py-2.5 text-sm font-semibold text-ink transition hover:bg-orange-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange dark:border-night-line dark:text-night-ink dark:hover:bg-white/5">Deny</button>
+            </div>
+          </div>
         )}
         {busy && !guideRun && (
           <div role="status" className="flex items-center gap-2 text-base text-muted dark:text-night-muted">
@@ -239,11 +255,14 @@ function GuideCard({
       {/* answer card */}
       {run.final && (
         <div className="min-w-0 max-w-full rounded-xl border border-orange-ring bg-white px-3 py-2.5 dark:border-night-line dark:bg-night-panel">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <span className="text-[10px] font-bold uppercase tracking-wide text-orange">Answer</span>
-            <span data-testid="guide-status" className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusPill}`}>
-              {run.final.status}
-            </span>
+            <div className="flex items-center gap-1">
+              <span data-testid="guide-status" className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusPill}`}>
+                {run.final.status}
+              </span>
+              {run.final.answer.trim() && <CopyButton text={cleanAnswer(run.final.answer)} />}
+            </div>
           </div>
           <p className="mt-2 text-base leading-7 text-ink dark:text-night-ink">
             {renderAnswerWithEvidence(run.final.answer, scratchpad, setOpenEv)}
@@ -414,6 +433,54 @@ function IconBtn({
   );
 }
 
+// Strip inline citation/evidence markers so copied text reads naturally.
+function cleanAnswer(text: string): string {
+  return text
+    .replace(/\[([A-Za-z]{0,2}\d+)\]/g, '') // Find markers: [1], [V1]
+    .replace(/\[EV:[a-z0-9-]+\]/gi, '') // Guide markers: [EV:name]
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/ +([.,;:!?])/g, '$1')
+    .trim();
+}
+
+// Small inline "copy to clipboard" button with a transient confirmation.
+function CopyButton({ text, label = 'Copy answer' }: { text: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+  const copy = async () => {
+    const value = text.trim();
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* Clipboard unavailable (insecure context / denied): fail silently. */
+    }
+  };
+  return (
+    <button
+      onClick={copy}
+      aria-label={label}
+      title={copied ? 'Copied' : label}
+      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-orange/10 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange dark:text-night-muted dark:hover:text-night-ink"
+    >
+      {copied ? (
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <path d="M5 12l4 4 10-10" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ) : (
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+          <rect x="9" y="9" width="11" height="11" rx="2" />
+          <path d="M5 15V5a2 2 0 0 1 2-2h8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
 function Message({
   m,
 }: {
@@ -439,15 +506,15 @@ function Message({
   return (
     <div className={`break-words text-base leading-7 ${m.error ? 'text-[#9b6443]' : 'text-ink dark:text-night-ink'}`}>
       {!m.error && (
-        <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-ink dark:text-night-ink">
-          <span>🍊</span> PageGuide
+        <div className="mb-2 flex items-center justify-between gap-2 text-sm font-semibold text-ink dark:text-night-ink">
+          <span className="flex items-center gap-2"><span>🍊</span> PageGuide</span>
+          {m.text.trim() && <CopyButton text={cleanAnswer(m.text)} />}
         </div>
       )}
       <p className={`whitespace-pre-wrap ${m.error ? 'rounded-lg bg-[#fff2e9] px-3 py-2 dark:bg-[#3a2a22]' : ''}`}>
         {isFind ? renderAnswer(m.text, citations, visual) : m.text}
       </p>
       {visual && <VisualEvidence v={visual} />}
-
     </div>
   );
 }
@@ -455,7 +522,7 @@ function Message({
 // Render the answer text, turning [1], [2], [V1] tokens into clickable citation chips.
 function renderAnswer(
   text: string,
-  citations: { marker: string; id: string }[],
+  citations: { marker: string; id: string; quote?: string }[],
   visual: { marker: string; id: string } | null,
 ) {
   const parts: ReactNode[] = [];
@@ -472,7 +539,7 @@ function renderAnswer(
         <button
           key={`c${k++}`}
           onClick={() => useStore.getState().focusEvidence(cite.id)}
-          title="Show source on the page"
+          title={cite.quote ? `“${cite.quote}”` : 'Show source on the page'}
           className="align-super text-[9px] font-semibold text-[#6366f1] hover:underline dark:text-[#a5a1f5]"
         >
           [{marker}]

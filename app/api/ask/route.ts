@@ -36,12 +36,13 @@ Return ONLY a JSON object, no prose outside it.
 If mode is "find":
 Write concise, separately supported claims. Citations must appear throughout the answer, immediately after the fact they support—not as a list at the end.
 {"claims": [{"text": "<one short factual clause or sentence, no citation tokens>", "markers": ["1"]}, {"text": "<the next distinct supported fact>", "markers": ["2"]}],
- "citations": [{"marker": "1", "id": "<block supporting the first claim>", "quote": "<exact supporting phrase>"}, {"marker": "2", "id": "<block supporting the next claim>", "quote": "<exact supporting phrase>"}],
+ "citations": [{"marker": "1", "id": "<block supporting the first claim>", "quote": "<exact supporting passage>", "emphasis": "<optional key phrase within quote>"}, {"marker": "2", "id": "<block supporting the next claim>", "quote": "<exact supporting passage>"}],
  "visual": {"marker": "V1", "id": "<image block id>", "box": [x, y, w, h], "caption": "<what the box shows>"} }
 - Split different facts into separate claims. For example, a definition with marker 1, a history fact with marker 2, and an application with marker 3 become THREE claims, not one long paragraph followed by [1][2][3]. A single claim can use multiple markers only if they jointly support that same fact.
 - Do not add a separate sources/citations footer. The server assembles each claim and its markers inline in the order you provide.
 - Every citation "id" MUST be a text block id (heading/paragraph/listitem/quote) from the page.
-- "quote" MUST be an exact, verbatim substring of that block's text — the specific sentence or phrase that supports the point, NOT the whole block. Copy it character-for-character.
+- "quote" MUST be an exact, verbatim substring of that block's text: the supporting passage, a complete sentence or clause that gives enough context (it may be on the longer side). Copy it character-for-character.
+- "emphasis" is OPTIONAL: when one specific phrase inside "quote" most directly supports the point, set "emphasis" to that exact phrase — a verbatim substring of "quote" — and it will be highlighted more strongly within the quote. Omit it when the whole quote is the point.
 - Use "visual" ONLY when one of the provided IMAGE blocks supports the answer: "id" is that image's block id and "box" is the region of THAT image supporting the answer as normalized [x, y, width, height], each 0..1 from the image's top-left corner. Otherwise set "visual" to null.
 - If the user's message is a greeting, small talk, or NOT a question about this page (e.g. "hi", "hello", "thanks"), do NOT answer from the page: return one short claim inviting them to ask about the page, with "markers": [], "citations": [], and "visual": null. Never fabricate an answer or a citation.
 - If the page does not contain the answer, say so plainly and return empty "citations". Never invent facts or citations.
@@ -227,11 +228,17 @@ export async function POST(req: NextRequest) {
         .map((c: any) => {
           // keep the quote only if it's genuinely a substring of the block text
           let quote: string | undefined;
+          let emphasis: string | undefined;
           if (typeof c.quote === 'string' && c.quote.trim()) {
             const blockText = textById.get(c.id) || '';
-            if (norm(blockText).includes(norm(c.quote))) quote = c.quote.trim();
+            const qv = c.quote.trim();
+            if (norm(blockText).includes(norm(qv))) {
+              quote = qv;
+              // keep the inner emphasis only if it's a verbatim sub-span of the quote
+              if (typeof c.emphasis === 'string' && c.emphasis.trim() && norm(qv).includes(norm(c.emphasis))) emphasis = c.emphasis.trim();
+            }
           }
-          return { marker: String(c.marker ?? ''), id: c.id, ...(quote ? { quote } : {}) };
+          return { marker: String(c.marker ?? ''), id: c.id, ...(quote ? { quote } : {}), ...(emphasis ? { emphasis } : {}) };
         });
 
       let visual: {
@@ -260,10 +267,29 @@ export async function POST(req: NextRequest) {
           caption: typeof v.caption === 'string' ? v.caption.slice(0, 200) : undefined,
         };
       }
-      const allowed = new Set<string>([...citations.map((c: { marker: string }) => c.marker), ...(visual ? [visual.marker] : [])]);
-      const inlineAnswer = composeFindAnswer(parsed?.claims, answer, allowed);
+      // Renumber citations to clean sequential markers (1, 2, 3…) regardless of the
+      // labels the model used (it often reuses block ids like "n7"), so the UI shows [1], [2].
+      const markerMap = new Map<string, string>();
+      const renumbered = citations.map((c: { marker: string; id: string; quote?: string }, i: number) => {
+        const next = String(i + 1);
+        if (c.marker && !markerMap.has(c.marker)) markerMap.set(c.marker, next);
+        return { ...c, marker: next };
+      });
+      const remap = (m: string) => markerMap.get(m) ?? m; // leaves visual markers (V1) untouched
+      const claims = Array.isArray(parsed?.claims)
+        ? parsed.claims.map((cl: any) => ({ ...cl, markers: Array.isArray(cl?.markers) ? cl.markers.map((m: any) => remap(String(m))) : cl?.markers }))
+        : parsed?.claims;
+
+      const allowed = new Set<string>([...renumbered.map((c: { marker: string }) => c.marker), ...(visual ? [visual.marker] : [])]);
+      const inlineAnswer = composeFindAnswer(claims, answer, allowed);
       if (!inlineAnswer) return NextResponse.json({ error: 'The model returned no answer.' }, { status: 502 });
-      return NextResponse.json({ kind: 'find', answer: inlineAnswer, citations, visual, usage, debug });
+      // Only keep evidence whose marker actually appears in the answer, so every on-page
+      // highlight maps to a visible [n] in the answer (and vice versa) — no orphaned highlights.
+      const used = new Set<string>();
+      for (const mm of inlineAnswer.matchAll(/\[([A-Za-z]{0,2}\d+)\]/g)) used.add(mm[1]);
+      const citationsOut = renumbered.filter((c: { marker: string }) => used.has(c.marker));
+      const visualOut = visual && used.has(visual.marker) ? visual : null;
+      return NextResponse.json({ kind: 'find', answer: inlineAnswer, citations: citationsOut, visual: visualOut, usage, debug });
     }
 
     // guide
