@@ -242,10 +242,10 @@ export function applySandboxAction(s: SandboxState, action: BrowserAction, lib: 
     else if (n.site === 'met-map' && id === 'zoom-out') n.mapZoom = Math.max(.75, (s.mapZoom || 1) - .25);
     else if (n.site === 'met-map' && id === 'reset-map') n.mapZoom = 1;
     else if (n.site === 'met-map' && id === 'close-room') { n.selected = ''; n.mapPlace = ''; n.mapRouting = false; }
-    else if (n.site === 'met-map' && id === 'directions') n.mapRouting = !s.mapRouting;
+    else if (n.site === 'met-map' && id === 'directions') { n.view = 'map'; n.mapRouting = !s.mapRouting; }
     else if (n.site === 'met-map' && id === 'clear-map-search') { n.query = ''; n.mapAmenity = ''; n.mapPlace = ''; n.mapRouting = false; }
-    else if (n.site === 'met-map' && id.startsWith('amenity-')) { n.mapAmenity = s.mapAmenity === id.slice(8) ? '' : id.slice(8); n.query = AMENITIES.find(a => amenityKey(a) === n.mapAmenity) || ''; n.selected = ''; n.mapPlace = ''; n.mapRouting = false; }
-    else if (n.site === 'met-map' && id.startsWith('place-')) { const place = MET_PLACES.find(p => p.id === id.slice(6))!; n.mapPlace = place.id; n.selected = ''; n.mapRouting = false; if (place.floor === 1 || place.floor === 2) n.mapFloor = place.floor; n.mapZoom = Math.max(1.25, s.mapZoom || 1); }
+    else if (n.site === 'met-map' && id.startsWith('amenity-')) { n.view = 'map'; n.mapAmenity = s.mapAmenity === id.slice(8) ? '' : id.slice(8); n.query = AMENITIES.find(a => amenityKey(a) === n.mapAmenity) || ''; n.selected = ''; n.mapPlace = ''; n.mapRouting = false; }
+    else if (n.site === 'met-map' && id.startsWith('place-')) { const place = MET_PLACES.find(p => p.id === id.slice(6))!; n.view = 'map'; n.mapPlace = place.id; n.selected = ''; n.mapRouting = false; if (place.floor === 1 || place.floor === 2) n.mapFloor = place.floor; n.mapZoom = Math.max(1.25, s.mapZoom || 1); }
     else if (n.site === 'met-map' && id.startsWith('room-')) { n.selected = id.slice(5); n.mapPlace = ''; n.view = 'map'; n.mapRouting = false; n.notice = 'Gallery selected on the museum map.'; }
     else if (['cart', 'orders', 'wishlist', 'bookmarks'].includes(id)) n.view = id as SandboxState['view'];
     else if (id === 'settings') { n.view = 'settings'; n.draftLanguage = s.language; }

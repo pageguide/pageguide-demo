@@ -86,7 +86,8 @@ interface StoreState {
   focusedEvidence: string | null; // the one the user clicked (shown stronger)
   guide: GuideState | null;
   guideRun: GuideRun | null; // the autonomous Guide run (task card + journey + answer)
-  pendingConfirm: { kind: string; label: string; title: string; detail: string; instruction: string } | null; // an irreversible action awaiting user approval
+  uiMode: 'find' | 'auto' | 'manual'; // find = answer with sources; auto = agent runs the task; manual = user approves each step
+  pendingConfirm: { mode: 'risk' | 'step'; kind: string; label: string; title: string; detail: string; instruction: string } | null; // an action awaiting user approval
   scratchpad: Evidence[]; // named evidence saved during the run
   fieldValues: Record<string, string>;
   clicked: string[];
@@ -128,6 +129,7 @@ interface StoreState {
   toggleReasoning: () => void;
   closeGuideRun: () => void;
   resolveConfirm: (ok: boolean) => void;
+  setUiMode: (m: 'find' | 'auto' | 'manual') => void;
 
   saveChat: () => void;
   loadChat: (id: string) => void;
@@ -236,6 +238,7 @@ export const useStore = create<StoreState>((set, get) => ({
   focusedEvidence: null,
   guide: null,
   guideRun: null,
+  uiMode: 'find',
   pendingConfirm: null,
   scratchpad: [],
   fieldValues: {},
@@ -675,6 +678,7 @@ export const useStore = create<StoreState>((set, get) => ({
   },
   closeGuideRun: () => { agentAbort?.abort(); set({ guideRun: null, scratchpad: [], guide: null, pendingConfirm: null, busy: false }); },
   resolveConfirm: (ok) => { confirmResolver?.(ok); },
+  setUiMode: (m) => set({ uiMode: m }),
 
   clearChat: () => {
     agentAbort?.abort();
@@ -759,8 +763,7 @@ const MAX_AGENT_STEPS = 16;
 // user approves/denies (or false if the run is aborted while waiting).
 function requestConfirm(
   set: (p: Partial<StoreState>) => void,
-  risk: NonNullable<ReturnType<typeof actionRisk>>,
-  instruction: string,
+  prompt: NonNullable<StoreState['pendingConfirm']>,
   signal: AbortSignal,
 ): Promise<boolean> {
   return new Promise((resolve) => {
@@ -775,8 +778,15 @@ function requestConfirm(
     confirmResolver = finish;
     if (signal.aborted) return finish(false);
     signal.addEventListener('abort', () => finish(false), { once: true });
-    set({ pendingConfirm: { kind: risk.kind, label: risk.label, title: risk.title, detail: risk.detail, instruction } });
+    set({ pendingConfirm: prompt });
   });
+}
+
+// A short description of what a manual step will do, for the step-confirm card.
+function describeStep(action: BrowserAction): string {
+  if (action.type === 'fill') return `Type into the highlighted field${action.value ? `: “${action.value}”` : ''}.`;
+  if (action.type === 'navigate') return 'Open the highlighted link.';
+  return 'Click the highlighted control on the page.';
 }
 
 async function runAgent(
@@ -811,13 +821,21 @@ async function runAgent(
       if (!res.ok) throw new Error(data?.error || 'The agent failed.');
       const { instruction, action, evidence } = data as { instruction: string; action: BrowserAction; evidence?: EvidenceRequest };
       if (!action || !['navigate', 'click', 'fill', 'finish'].includes(action.type)) throw new Error('The agent returned an invalid action.');
-      // Gate irreversible actions (checkout, posting, cancel/delete) behind user approval.
+      // Manual mode: pause on every executable step. Auto mode: pause only for irreversible actions.
       const risk = site ? actionRisk(action) : null;
-      if (risk) {
-        if (action.id) set({ guide: { steps: [{ id: action.id, instruction }], current: 0 } }); // highlight the control to be actioned
-        const approved = await requestConfirm(set, risk, instruction, signal);
+      const manual = get().uiMode === 'manual' && action.type !== 'finish';
+      if (risk || manual) {
+        set({ guide: action.id ? { steps: [{ id: action.id, instruction }], current: 0 } : null }); // Never point to a stale target on URL-only navigation.
+        const prompt: NonNullable<StoreState['pendingConfirm']> = risk
+          ? { mode: 'risk', kind: risk.kind, label: risk.label, title: risk.title, detail: risk.detail, instruction }
+          : { mode: 'step', kind: 'step', label: 'step', title: 'Next step', detail: describeStep(action), instruction };
+        const approved = await requestConfirm(set, prompt, signal);
         if (!alive()) return;
-        if (!approved) { set({ guide: null }); stopReason = `You declined the ${risk.label} step: “${instruction}”.`; break; }
+        if (!approved) {
+          set({ guide: null });
+          stopReason = risk ? `You declined the ${risk.label} step: “${instruction}”.` : `You stopped the run at: “${instruction}”.`;
+          break;
+        }
       }
       const run = get().guideRun!;
       const idx = run.journey.length;

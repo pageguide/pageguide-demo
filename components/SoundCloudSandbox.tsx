@@ -65,7 +65,7 @@ export default function SoundCloudSandbox({ doc }: { doc: PageDoc }) {
       <img src={`/sandbox/${current.image}.jpg`} alt="" /><div className="sc-player-title"><small>{current.artist}</small><b>{current.title}</b></div>{control(`like-${current.id}`, s.liked.includes(current.id) ? '♥' : '♡', s.liked.includes(current.id) ? 'sc-liked' : '')}
     </footer>
     {error && <div role="alert" className="sc-audio-error">{error}</div>}
-    <audio ref={audio} src={`/sandbox/${current.id}.wav`} preload="metadata" onTimeUpdate={e => setTime(e.currentTarget.currentTime)} onLoadedMetadata={e => { setDuration(e.currentTarget.duration); setTime(0); }} onEnded={() => { if (playing) act(`play-${current.id}`); }} onError={() => setError('The audio preview could not be loaded. Please try another track.')} />
+    <audio ref={audio} src={`/sandbox/${current.id}.wav`} preload="metadata" onTimeUpdate={e => setTime(e.currentTarget.currentTime)} onLoadedMetadata={e => { setDuration(e.currentTarget.duration); setTime(0); }} onEnded={() => { const state = useStore.getState(); const session = state.sandboxSessions.soundcloud; if (session?.selected === current.id && session.soundPlaying !== false) state.actOnSandbox({ type: 'click', id: `play-${current.id}` }); }} onError={() => setError('The audio preview could not be loaded. Please try another track.')} />
     <p {...node('current-state')} className="sr-only">{doc.blocks.find(b => b.id === 'current-state')?.text}</p>
   </div>;
 }
