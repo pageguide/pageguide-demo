@@ -32,7 +32,14 @@ export interface PageDoc {
   html?: string; // sanitized full-page HTML for faithful display in an iframe
   saved?: boolean; // original website HTML saved locally, with scripts removed
   savedAt?: string;
-  sandbox?: 'amazon' | 'quora';
+  sourceFile?: string;
+  sandbox?: 'amazon' | 'quora' | 'soundcloud' | 'met-map';
+}
+
+export interface PageSelection {
+  id: string;
+  text: string;
+  url: string;
 }
 
 export interface SearchResult {
@@ -114,6 +121,7 @@ export interface Evidence {
   label?: string;
   step?: number;
   annotation?: string;
+  targetId?: string; // page block that is visually marked while this evidence is active
   index: number; // 1-based badge number
   imageUrl: string;
   box?: [number, number, number, number]; // annotation bounding box (normalized)
@@ -150,6 +158,7 @@ export interface AskRequestBody {
   mode: Mode;
   question: string;
   doc: PageDoc;
+  selection?: PageSelection;
 }
 
 export interface SavedChat {

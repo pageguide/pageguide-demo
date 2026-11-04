@@ -1,9 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Block, PageDoc } from '@/lib/types';
+import type { Block, PageDoc, PageSelection } from '@/lib/types';
+import { readPageSelection } from '@/lib/page-selection';
 
-type Evidence = { id: string; quote?: string; marker?: string };
+type Evidence = { id: string; quote?: string; marker?: string; annotation?: string };
 
 const HILITE_CSS = `
 [data-pg-ev], mark[data-pg-ev]{background:#fff5ed !important;color:#553b2c !important;box-shadow:0 0 0 1px #edc7ab;border-radius:5px}
@@ -11,7 +12,7 @@ const HILITE_CSS = `
 [data-pg-ev] a,[data-pg-focus] a,a[data-pg-ev],a[data-pg-focus]{color:#9c4f25 !important;text-decoration-color:#d6a07d !important}
 [data-pg-gd]{box-shadow:0 0 0 3px #f0792b !important;background:#fff6ee !important;border-radius:6px;scroll-margin:100px}
 mark[data-pg-ev],mark[data-pg-focus]{padding:0 1px}
-sup[data-pg-badge]{background:#a85024;color:#fff;border-radius:5px;padding:0 4px;font-size:9px;font-weight:700;margin:0 2px;vertical-align:super;cursor:pointer;line-height:1.4;font-family:ui-sans-serif,system-ui,sans-serif;text-decoration:none}
+sup[data-pg-badge]{background:#ec3973;color:#fff;border-radius:5px;padding:2px 5px;font-size:9px;font-weight:700;margin:0 3px;vertical-align:super;cursor:pointer;line-height:1.4;font-family:ui-sans-serif,system-ui,sans-serif;text-decoration:none}
 sup[data-pg-badge][data-focused]{box-shadow:0 0 0 2px #f3ceb4}
 html{scroll-behavior:smooth}
 `;
@@ -73,6 +74,7 @@ export default function PageView({
   onBlockClick,
   onNavigate,
   onFieldChange,
+  onSelection,
 }: {
   doc: PageDoc;
   evidence: Evidence[];
@@ -83,6 +85,7 @@ export default function PageView({
   onBlockClick: (b: Block) => void;
   onFieldChange: (id: string, v: string) => void;
   onNavigate: (href: string) => void;
+  onSelection?: (selection: PageSelection) => void;
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [ready, setReady] = useState(false);
@@ -120,6 +123,14 @@ export default function PageView({
       },
       true,
     );
+    const captureSelection = () => {
+      const selected = d.body && readPageSelection(d.body, doc.url);
+      if (selected) onSelection?.(selected);
+    };
+    let selectionTimer: ReturnType<typeof setTimeout>;
+    d.addEventListener('selectionchange', () => { clearTimeout(selectionTimer); selectionTimer = setTimeout(captureSelection, 100); });
+    d.addEventListener('mouseup', captureSelection);
+    d.addEventListener('keyup', captureSelection);
     d.addEventListener('input', (e) => {
       const el = e.target as HTMLInputElement;
       const id = el.getAttribute('data-pg-id');
@@ -128,7 +139,7 @@ export default function PageView({
     // Remote snapshots cannot submit real forms; sandbox pages provide safe working forms.
     d.addEventListener('submit', (e) => e.preventDefault());
     setReady(true);
-  }, [doc, onBlockClick, onNavigate, onFieldChange]);
+  }, [doc, onBlockClick, onNavigate, onFieldChange, onSelection]);
 
   // Apply all evidence highlights (persist), focus the clicked one, plus guide target.
   useEffect(() => {
@@ -149,7 +160,7 @@ export default function PageView({
     });
 
     if (guideId) {
-      const el = d.querySelector(`[data-pg-id="${guideId}"]`) as HTMLElement | null;
+      const el = d.querySelector(`[data-pg-id="${guideId}"],[data-pg-selection-ids~="${guideId}"]`) as HTMLElement | null;
       if (el) {
         el.setAttribute('data-pg-gd', '');
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -158,7 +169,7 @@ export default function PageView({
 
     let focusEl: Element | null = null;
     for (const ev of evidence) {
-      const el = d.querySelector(`[data-pg-id="${ev.id}"]`);
+      const el = d.querySelector(`[data-pg-id="${ev.id}"],[data-pg-selection-ids~="${ev.id}"]`);
       if (!el) continue;
       const focused = ev.id === focusedEvidence;
       const lastMark = ev.quote ? markSpan(el, ev.quote, focused) : null;
@@ -168,7 +179,8 @@ export default function PageView({
         const badge = d.createElement('sup');
         badge.setAttribute('data-pg-badge', '');
         if (focused) badge.setAttribute('data-focused', '');
-        badge.textContent = ev.marker;
+        badge.textContent = ev.annotation ? `${ev.marker} · ${ev.annotation}` : ev.marker;
+        badge.title = ev.annotation || `Evidence ${ev.marker}`;
         if (lastMark) lastMark.after(badge);
         else el.appendChild(badge);
       }
@@ -188,7 +200,7 @@ export default function PageView({
   }, [fieldValues, ready]);
 
   if (!doc.html)
-    return <ReaderFallback doc={doc} evidence={evidence} focusedEvidence={focusedEvidence} guideId={guideId} onBlockClick={onBlockClick} />;
+    return <ReaderFallback doc={doc} evidence={evidence} focusedEvidence={focusedEvidence} guideId={guideId} onBlockClick={onBlockClick} onSelection={onSelection} />;
 
   return (
     <iframe
@@ -210,12 +222,14 @@ function ReaderFallback({
   focusedEvidence,
   guideId,
   onBlockClick,
+  onSelection,
 }: {
   doc: PageDoc;
   evidence: Evidence[];
   focusedEvidence: string | null;
   guideId: string | null;
   onBlockClick: (b: Block) => void;
+  onSelection?: (selection: PageSelection) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const byId = new Map(evidence.map((e) => [e.id, e]));
@@ -225,7 +239,9 @@ function ReaderFallback({
     ref.current.querySelector(`[data-node-id="${t}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [focusedEvidence, guideId]);
   return (
-    <div ref={ref} className="pg-scroll h-full overflow-auto bg-white dark:bg-night-panel">
+    <div ref={ref} onMouseUp={() => { const selected = ref.current && readPageSelection(ref.current, doc.url); if (selected) onSelection?.(selected); }}
+      onKeyUp={() => { const selected = ref.current && readPageSelection(ref.current, doc.url); if (selected) onSelection?.(selected); }}
+      className="pg-scroll h-full overflow-auto bg-white dark:bg-night-panel">
       <div className="mx-auto max-w-[760px] px-6 py-7">
         {doc.blocks.map((b) => {
           const ev = byId.get(b.id);

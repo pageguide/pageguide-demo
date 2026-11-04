@@ -3,12 +3,15 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore, type GuideRun } from '@/lib/store';
-import type { Evidence } from '@/lib/types';
+import type { Evidence, PageSelection } from '@/lib/types';
+import { evidenceForAnswer } from '@/lib/evidence';
 
 export default function SidePanel() {
   const {
     settings,
     doc,
+    selection,
+    setSelection,
     messages,
     busy,
     ask,
@@ -78,7 +81,7 @@ export default function SidePanel() {
       </header>
 
       {/* conversation */}
-      <div ref={logRef} className={`pg-scroll min-h-0 flex-1 overflow-y-auto px-5 py-5 ${messages.length === 0 && !guideRun ? 'flex flex-col justify-center' : 'space-y-6'}`}>
+      <div ref={logRef} className={`pg-chat-log pg-scroll min-h-0 min-w-0 flex-1 overflow-y-auto px-5 py-5 ${messages.length === 0 && !guideRun ? 'flex flex-col justify-center' : 'space-y-6'}`}>
         {messages.length === 0 && !guideRun && (
           <div className="pb-8 text-center">
             <div aria-hidden="true" className="mx-auto mb-5 text-5xl">🍊</div>
@@ -93,6 +96,7 @@ export default function SidePanel() {
         ))}
         {guideRun && (
           <GuideCard
+            key={guideRun.id}
             run={guideRun}
             scratchpad={scratchpad}
             openEv={openEv}
@@ -106,6 +110,18 @@ export default function SidePanel() {
           </div>
         )}
       </div>
+
+      {selection && <aside aria-label="Selected text context" className="mx-3 mb-2 flex shrink-0 items-start gap-2 rounded-2xl border border-orange-ring bg-white/70 px-4 py-3 dark:border-night-line dark:bg-white/5">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-[#a85024] dark:text-orange">Selected text</p>
+          <blockquote title={selection.text} className="mt-1 line-clamp-2 break-words text-sm leading-relaxed text-muted dark:text-night-muted">“{selection.text}”</blockquote>
+        </div>
+        <button aria-label="Remove selected text" onClick={() => {
+          document.querySelector<HTMLIFrameElement>('[data-pageguide-page] iframe')?.contentDocument?.getSelection()?.removeAllRanges();
+          window.getSelection()?.removeAllRanges();
+          setSelection(null);
+        }} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#a85024] hover:bg-orange-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange dark:text-orange">✕</button>
+      </aside>}
 
       {/* Read-only page context, tucked above the composer. */}
       {doc && (
@@ -176,6 +192,9 @@ function GuideCard({
   onToggleJourney: () => void;
 }) {
   const [openStep, setOpenStep] = useState<number | null>(null);
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
+  const evidenceId = useId();
+  const citedEvidence = evidenceForAnswer(run.final?.answer || '', scratchpad);
   const stepEvidence = (i: number): Evidence => ({ name: `journey-step-${i}`, label: i === 0 ? 'Initial state' : `Step ${i}`, index: i, imageUrl: run.journey[i].screenshot!, caption: run.journey[i].instruction, capturedAt: run.journey[i].capturedAt });
   const dot = (s: string) =>
     s === 'done' ? 'bg-sage' : s === 'failed' ? 'bg-red-500' : s === 'running' ? 'bg-orange animate-pulse' : 'bg-line dark:bg-night-line';
@@ -188,7 +207,7 @@ function GuideCard({
   const current = run.journey.find((j) => j.status === 'running');
 
   return (
-    <div className="space-y-2">
+    <div className="pg-guide-card min-w-0 max-w-full space-y-2">
       {/* task card */}
       <div className="rounded-xl border border-line bg-white px-3 py-2.5 shadow-soft dark:border-night-line dark:bg-night-panel">
         <div className="flex items-start justify-between gap-2">
@@ -221,7 +240,7 @@ function GuideCard({
 
       {/* answer card */}
       {run.final && (
-        <div className="rounded-xl border border-orange-ring bg-white px-3 py-2.5 dark:border-night-line dark:bg-night-panel">
+        <div className="min-w-0 max-w-full rounded-xl border border-orange-ring bg-white px-3 py-2.5 dark:border-night-line dark:bg-night-panel">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wide text-orange">Answer</span>
             <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusPill}`}>
@@ -234,21 +253,26 @@ function GuideCard({
           {run.final.verification && <p data-testid="verification-result" className="mt-3 rounded-lg bg-orange-soft/50 px-3 py-2 text-xs leading-relaxed text-[#885532] dark:bg-white/5 dark:text-orange">
             {run.final.verification.completed ? 'Verified' : run.final.verification.source === 'unavailable' ? 'Verification unavailable' : 'Not complete'} · {run.final.verification.reason}
           </p>}
-          {scratchpad.length > 0 && (
-            <section aria-label="Saved evidence" className="mt-4 border-t border-orange-ring pt-3 dark:border-night-line">
-              <p className="mb-2 text-sm font-semibold text-ink dark:text-night-ink">Saved evidence ({scratchpad.length})</p>
-              <div className="grid grid-cols-2 gap-2">
-                {scratchpad.map((ev) => <div key={ev.name} className="min-w-0 rounded-xl border border-line bg-cream p-2 dark:border-night-line dark:bg-night">
-                  <button onClick={() => setOpenEv(ev.name)} aria-label={`Enlarge screenshot ${ev.index}`} className="block w-full overflow-hidden rounded-lg bg-white">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={ev.imageUrl} alt={`Screenshot ${ev.index}: ${ev.caption || 'Captured page'}`} className="h-28 w-full object-contain" />
-                  </button>
-                  <div className="mt-1 flex flex-wrap items-center gap-1">
-                    <EvidenceBadge ev={ev} onOpen={() => setOpenEv(ev.name)} />
-                    <span className="min-w-0 text-xs font-medium text-ink dark:text-night-ink">{ev.label || ev.caption}</span>
-                    {ev.step !== undefined && <span className="w-full px-1 text-xs text-muted dark:text-night-muted">Saved at step {ev.step}</span>}
-                  </div>
-                </div>)}
+          {citedEvidence.length > 0 && (
+            <section aria-label="Saved evidence" className="mt-4 min-w-0 border-t border-orange-ring pt-2 dark:border-night-line">
+              <button aria-expanded={evidenceOpen} aria-controls={evidenceId} onClick={() => setEvidenceOpen((open) => !open)}
+                className="flex min-h-11 w-full items-center gap-2 rounded-lg text-left text-sm font-semibold text-ink hover:text-orange dark:text-night-ink">
+                <span aria-hidden="true" className={`shrink-0 transition-transform ${evidenceOpen ? 'rotate-90' : ''}`}>▸</span>
+                Saved evidence ({citedEvidence.length})
+              </button>
+              <div id={evidenceId} hidden={!evidenceOpen}>
+                {evidenceOpen && <div className="pg-evidence-grid pt-2">
+                  {citedEvidence.map((ev) => <div key={ev.name} className="min-w-0 rounded-xl border border-line bg-cream p-2 dark:border-night-line dark:bg-night">
+                    <button onClick={() => setOpenEv(ev.name)} aria-label={`Enlarge screenshot ${ev.index}`} className="block w-full overflow-hidden rounded-lg bg-white">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={ev.imageUrl} alt={ev.caption || ev.label || 'Agent-selected evidence'} className="h-28 w-full object-contain" />
+                    </button>
+                    <div className="mt-2 flex min-w-0 items-start gap-1">
+                      <EvidenceBadge ev={ev} onOpen={() => setOpenEv(ev.name)} />
+                      <span className="min-w-0 flex-1 text-sm leading-relaxed text-ink dark:text-night-ink">{ev.label || ev.caption}</span>
+                    </div>
+                  </div>)}
+                </div>}
               </div>
             </section>
           )}
@@ -353,7 +377,7 @@ function EvidenceViewer({ ev, onClose }: { ev: Evidence | undefined; onClose: ()
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-sm font-semibold text-[#8c5a2b]">📷 {ev.label || ev.name.replace(/-/g, ' ')}{ev.step !== undefined ? ` · Step ${ev.step}` : ''}</span>
+          <span className="text-sm font-semibold text-[#8c5a2b]">📷 {ev.label || ev.name.replace(/-/g, ' ')}</span>
           <button aria-label="Close screenshot" autoFocus onClick={onClose} className="flex h-10 w-10 items-center justify-center text-muted hover:text-ink dark:text-night-muted">
             ✕
           </button>
@@ -398,11 +422,12 @@ function IconBtn({
 function Message({
   m,
 }: {
-  m: { id: number; role: string; text: string; error?: boolean; action?: boolean; result?: any };
+  m: { id: number; role: string; text: string; error?: boolean; action?: boolean; result?: any; selection?: PageSelection };
 }) {
   if (m.role === 'user') {
     return (
       <div className="ml-6 whitespace-pre-wrap break-words rounded-3xl rounded-br-md bg-white/75 px-4 py-3 text-base leading-7 text-ink dark:bg-white/10 dark:text-night-ink">
+        {m.selection && <blockquote className="mb-2 border-l-2 border-orange-ring pl-3 text-sm leading-relaxed text-muted dark:text-night-muted">“{m.selection.text}”</blockquote>}
         {m.text}
       </div>
     );

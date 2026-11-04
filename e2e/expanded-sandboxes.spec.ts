@@ -43,7 +43,11 @@ test('Guide completes demo payment and saves the actual paid-order confirmation'
   await page.getByRole('button', { name: 'Guide: Buy oranges using demo checkout', exact: true }).click();
   await expect(page.getByText('Completed', { exact: true })).toBeVisible({ timeout: 25000 });
   await expect(page.locator('[data-node-id="order-confirmation"]')).toContainText('Evidence 1');
-  await expect(page.getByRole('region', { name: 'Saved evidence' }).locator('img')).toHaveCount(1);
+  const saved = page.getByRole('region', { name: 'Saved evidence' });
+  await expect(saved.locator('img')).toHaveCount(0);
+  await expect(saved.getByRole('button', { name: 'Saved evidence (1)', exact: true })).toHaveAttribute('aria-expanded', 'false');
+  // The inline answer citation remains available without opening the gallery.
+  await expect(page.getByRole('button', { name: 'Screenshot evidence 1', exact: true })).toBeVisible();
   await expect(page.getByTestId('verification-result')).toContainText('Verified');
 });
 

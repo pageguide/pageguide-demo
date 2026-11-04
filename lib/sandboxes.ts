@@ -1,11 +1,11 @@
 import type { Block, PageDoc } from './types';
 import type { Answer, Comment, Library, Post } from './library';
 
-export type SandboxSite = 'amazon' | 'quora';
+export type SandboxSite = 'amazon' | 'quora' | 'soundcloud' | 'met-map';
 export interface DemoOrder { id: string; items: Record<string, number>; total: number; payment: string; status: 'paid' | 'cancelled' }
 export interface SandboxState {
   site: SandboxSite;
-  view: 'home' | 'cart' | 'product' | 'settings' | 'post' | 'checkout' | 'orders' | 'wishlist' | 'ask' | 'bookmarks';
+  view: 'home' | 'cart' | 'product' | 'settings' | 'post' | 'checkout' | 'orders' | 'wishlist' | 'ask' | 'bookmarks' | 'library' | 'map';
   query: string; selected: string; cart: Record<string, number>; wishlist: string[];
   language: string; draftLanguage: string; liked: string[]; notice: string; revision: number;
   shipping: Record<'name' | 'address' | 'city' | 'postcode', string>;
@@ -13,18 +13,19 @@ export interface SandboxState {
   userPosts: Post[]; addedAnswers: Record<string, Answer[]>; addedComments: Record<string, Comment[]>;
   answerDraft: string; commentDrafts: Record<string, string>; questionDraft: { title: string; body: string; topic: string };
   answerVotes: string[]; followedTopics: string[]; bookmarks: string[];
+  mapFloor: 1 | 2;
 }
 export interface BrowserAction { type: string; id?: string; url?: string; value?: string }
 export const LANGUAGES = ['English', 'Spanish', 'French', 'Vietnamese'];
 export const sandboxUrl = (site: SandboxSite) => `https://${site}.pageguide.test/`;
 export function sandboxSite(url: string): SandboxSite | null {
-  try { const u = new URL(url); return (['amazon', 'quora'] as const).find((site) => u.origin === new URL(sandboxUrl(site)).origin) || null; } catch { return null; }
+  try { const u = new URL(url); return (['amazon', 'quora', 'soundcloud', 'met-map'] as const).find((site) => u.origin === new URL(sandboxUrl(site)).origin) || null; } catch { return null; }
 }
 export function initialSandbox(site: SandboxSite): SandboxState {
   return { site, view: 'home', query: '', selected: '', cart: {}, wishlist: [], language: 'English', draftLanguage: 'English', liked: [], notice: '', revision: 0,
     shipping: { name: '', address: '', city: '', postcode: '' }, checkoutStage: 'shipping', payment: 'Demo card •••• 4242', orders: [],
     userPosts: [], addedAnswers: {}, addedComments: {}, answerDraft: '', commentDrafts: {}, questionDraft: { title: '', body: '', topic: 'Everyday life' },
-    answerVotes: [], followedTopics: [], bookmarks: [],
+    answerVotes: [], followedTopics: [], bookmarks: [], mapFloor: 1,
   };
 }
 export const allPosts = (s: SandboxState, lib: Library): Post[] => [...s.userPosts, ...lib.posts];
@@ -41,7 +42,7 @@ export function stateUrl(s: SandboxState): string {
 }
 export function routeSandbox(s: SandboxState, url: string, lib: Library): SandboxState {
   const u = new URL(url), [path, selected = ''] = u.pathname.split('/').filter(Boolean);
-  const allowed = s.site === 'amazon' ? ['cart', 'checkout', 'orders', 'wishlist'] : ['settings', 'ask', 'bookmarks'];
+  const allowed = s.site === 'amazon' ? ['cart', 'checkout', 'orders', 'wishlist'] : s.site === 'quora' ? ['settings', 'ask', 'bookmarks'] : s.site === 'soundcloud' ? ['library'] : ['map'];
   const view = allowed.includes(path) ? path as SandboxState['view']
     : path === 'product' && s.site === 'amazon' && lib.products.some((p) => p.id === selected) ? 'product'
     : path === 'post' && s.site === 'quora' && allPosts(s, lib).some((p) => p.id === selected) ? 'post' : 'home';
@@ -57,6 +58,8 @@ const toggle = (items: string[], id: string) => items.includes(id) ? items.filte
 const topicId = (topic: string) => topic.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
 export function sandboxDoc(s: SandboxState, lib: Library): PageDoc {
+  if (s.site === 'soundcloud') return soundcloudDoc(s);
+  if (s.site === 'met-map') return metMapDoc(s);
   const amazon = s.site === 'amazon', posts = allPosts(s, lib);
   const blocks: Block[] = [
     paragraph('sandbox-label', `${amazon ? 'Amazon-style market' : 'Quora-style community'} · fictional isolated demo. No real accounts, purchases, or payments.`),
@@ -138,6 +141,44 @@ export function sandboxDoc(s: SandboxState, lib: Library): PageDoc {
   return { url: stateUrl(s), title: `${amazon ? 'Amazon' : 'Quora'} sandbox`, siteName: amazon ? 'Amazon-style demo' : 'Quora-style demo', sandbox: s.site, blocks };
 }
 
+function soundcloudDoc(s: SandboxState): PageDoc {
+  const tracks = [
+    ['midnight', 'Midnight Signals', 'Nova Vale', 'Electronic · 3:42'],
+    ['summer', 'Summer on Canal Street', 'Lena Parks', 'Indie pop · 3:18'],
+    ['greenroom', 'Green Room Session', 'The Coastline', 'Alternative · 4:06'],
+  ];
+  const blocks: Block[] = [
+    paragraph('sandbox-label', 'SoundCloud-style listening demo · fictional tracks and profiles. No real account or playback.'),
+    button('home', 'Home', 'navigation'), button('library', 'Library', 'navigation'), input('search', 'Search artists, tracks, and playlists', s.query, 'navigation'), button('search-submit', 'Search', 'navigation'),
+    paragraph('current-state', `Now playing: ${s.selected || 'nothing'}. Liked tracks: ${s.liked.join(', ') || 'none'}. Search: ${s.query || '(empty)'}.`),
+    heading('page-title', s.view === 'library' ? 'Your Library' : 'Trending for you'),
+  ];
+  for (const [id, title, artist, detail] of tracks) {
+    const group = `track-${id}`, playing = s.selected === id;
+    blocks.push(heading(`title-${id}`, title, group), paragraph(`artist-${id}`, `${artist} · ${detail}`, group), paragraph(`art-${id}`, id === 'midnight' ? '◒  NIGHT DRIVE' : id === 'summer' ? '☀  SUNLIT SESSIONS' : '≈  LIVE AT THE COAST', group), button(`play-${id}`, playing ? 'Pause preview' : `Play ${title}`, group), button(`like-${id}`, `${s.liked.includes(id) ? 'Unlike' : 'Like'} ${title}`, group));
+  }
+  blocks.push(heading('artists-heading', 'Artists to follow', 'artists'), paragraph('artist-nova', 'Nova Vale · 18.4K followers', 'artists'), button('follow-nova', `${s.followedTopics.includes('Nova Vale') ? 'Following' : 'Follow'} Nova Vale`, 'artists'), paragraph('artist-lena', 'Lena Parks · 7.2K followers', 'artists'), button('follow-lena', `${s.followedTopics.includes('Lena Parks') ? 'Following' : 'Follow'} Lena Parks`, 'artists'));
+  return { url: stateUrl(s), title: 'SoundCloud sandbox', siteName: 'SoundCloud-style demo', sandbox: 'soundcloud', blocks };
+}
+
+function metMapDoc(s: SandboxState): PageDoc {
+  const rooms = s.mapFloor === 1
+    ? [['great-hall', 'The Great Hall', 'Information desk and central entrance'], ['temple', 'Temple of Dendur', 'Gallery 131 · Egyptian Art'], ['impressionists', 'European Paintings', 'Gallery 825 · Impressionists'], ['arms', 'Arms and Armor', 'Gallery 371 · Medieval collection']]
+    : [['modern', 'Modern and Contemporary Art', 'Gallery 900'], ['robert-lehman', 'Robert Lehman Collection', 'Gallery 957'], ['american', 'The American Wing', 'Gallery 700']];
+  const blocks: Block[] = [
+    paragraph('sandbox-label', 'The Met Museum map demo · fictional indoor navigation. No live location data.'),
+    button('home', 'Museum map', 'navigation'), button('floor-1', 'Floor 1', 'navigation'), button('floor-2', 'Floor 2', 'navigation'), input('search', 'Search The Met', s.query, 'navigation'), button('search-submit', 'Search', 'navigation'),
+    paragraph('current-state', `Viewing Floor ${s.mapFloor}. Selected gallery: ${s.selected || 'none'}. Search: ${s.query || '(empty)'}.`),
+    heading('page-title', `The Met · Floor ${s.mapFloor}`), paragraph('map-overview', 'Central Park entrance · use a labeled gallery to view details and route guidance.'),
+  ];
+  for (const [id, title, detail] of rooms) {
+    const group = `room-${id}`;
+    blocks.push(heading(`room-title-${id}`, title, group), paragraph(`room-detail-${id}`, detail, group), button(`room-${id}`, `Open ${title}`, group));
+  }
+  if (s.selected) blocks.push(paragraph('route-guidance', `Route ready: follow the museum signs to ${rooms.find(([id]) => id === s.selected)?.[1] || s.selected}.`, 'route'));
+  return { url: stateUrl(s), title: 'The Met Map sandbox', siteName: 'Met Museum map demo', sandbox: 'met-map', blocks };
+}
+
 /** User clicks and agent actions have identical validation and state transitions. */
 export function applySandboxAction(s: SandboxState, action: BrowserAction, lib: Library): { state: SandboxState; observation: string } {
   const target = sandboxDoc(s, lib).blocks.find((b) => b.id === action.id && b.control);
@@ -156,6 +197,13 @@ export function applySandboxAction(s: SandboxState, action: BrowserAction, lib: 
   } else {
     if (target.type !== 'button') throw new Error('That target is not a clickable button.');
     if (id === 'home') { n.view = 'home'; n.query = ''; n.selected = ''; }
+    else if (n.site === 'soundcloud' && id === 'library') n.view = 'library';
+    else if (n.site === 'soundcloud' && id.startsWith('play-')) { n.selected = n.selected === id.slice(5) ? '' : id.slice(5); n.notice = n.selected ? 'Preview playing in this isolated demo.' : 'Preview paused.'; }
+    else if (n.site === 'soundcloud' && id.startsWith('like-')) { n.liked = toggle(s.liked, id.slice(5)); n.notice = 'Track like updated.'; }
+    else if (n.site === 'soundcloud' && id.startsWith('follow-')) { const artist = id.slice(7) === 'nova' ? 'Nova Vale' : 'Lena Parks'; n.followedTopics = toggle(s.followedTopics, artist); n.notice = `Follow status updated for ${artist}.`; }
+    else if (n.site === 'met-map' && id === 'floor-1') { n.mapFloor = 1; n.view = 'map'; n.selected = ''; }
+    else if (n.site === 'met-map' && id === 'floor-2') { n.mapFloor = 2; n.view = 'map'; n.selected = ''; }
+    else if (n.site === 'met-map' && id.startsWith('room-')) { n.selected = id.slice(5); n.view = 'map'; n.notice = 'Gallery selected on the museum map.'; }
     else if (['cart', 'orders', 'wishlist', 'bookmarks'].includes(id)) n.view = id as SandboxState['view'];
     else if (id === 'settings') { n.view = 'settings'; n.draftLanguage = s.language; }
     else if (id === 'ask-question') n.view = 'ask';
@@ -220,7 +268,7 @@ export function verifySandboxTask(task: string, s: SandboxState, lib: Library, i
     if (/\bwishlist\b/i.test(task)) for (const p of mentioned) checks.push({ passed: s.wishlist.includes(p.id), result: `${p.name} are saved to your wishlist.`, missing: `${p.name} are not in your wishlist.` });
     if (/\bcancel\b/i.test(task) && /\border\b/i.test(task)) checks.push({ passed: s.orders.some((o) => o.status === 'cancelled' && initial?.orders.some((before) => before.id === o.id && before.status === 'paid')), result: 'The demo order was cancelled and a simulated refund recorded.', missing: 'No previously paid demo order was cancelled during this run.' });
     if (!paying && /\b(open|go to|proceed to|start)\b.{0,30}\bcheckout\b/i.test(task)) checks.push({ passed: s.view === 'checkout' && itemCount(s) > 0, result: 'Demo checkout is open with items ready to review.', missing: 'Checkout must be open with a non-empty cart.' });
-  } else {
+  } else if (s.site === 'quora') {
     if (/language/i.test(task)) { const language = LANGUAGES.find((l) => task.toLowerCase().includes(l.toLowerCase())); checks.push({ passed: Boolean(language && s.language === language), result: `Your demo language preference is saved as ${s.language}.`, missing: language ? `Expected saved language ${language}; it is still ${s.language}. Selecting without saving is not enough.` : 'No supported target language was specified.' }); }
     if (/\b(find|browse|read|open)\b/i.test(task) && /\b(post|posts|gardening|programming|cooking|travel)\b/i.test(task)) { const p = allPosts(s, lib).find((p) => p.id === s.selected), topic = ['gardening', 'programming', 'cooking', 'travel'].find((t) => task.toLowerCase().includes(t)); checks.push({ passed: s.view === 'post' && Boolean(p && (!topic || p.topic.toLowerCase() === topic)), result: `Opened “${p?.title}” for reading.`, missing: `A ${topic || 'matching'} post must be opened, not just listed in search results.` }); }
     if (/\bupvote\b/i.test(task)) checks.push({ passed: /\banswer\b/i.test(task) ? s.answerVotes.some((id) => !initial?.answerVotes.includes(id)) : Boolean(s.selected && s.liked.includes(s.selected)), result: 'The requested vote is recorded.', missing: 'The requested upvote was not recorded.' });
@@ -229,6 +277,23 @@ export function verifySandboxTask(task: string, s: SandboxState, lib: Library, i
     if (/\b(write|publish|post|add|leave)\b.{0,30}\bcomment\b/i.test(task)) checks.push({ passed: Object.entries(s.addedComments).some(([id, comments]) => comments.slice(initial?.addedComments[id]?.length || 0).some((c) => !quoted || c.text.toLowerCase().includes(quoted))), result: 'Your demo comment was posted.', missing: 'No new comment was posted; a draft alone does not count.' });
     if (/\bfollow\b/i.test(task)) { const topic = allPosts(s, lib).map((p) => p.topic).find((t) => task.toLowerCase().includes(t.toLowerCase())); checks.push({ passed: Boolean(topic && s.followedTopics.includes(topic)), result: `You are following ${topic}.`, missing: 'The requested topic is not followed.' }); }
     if (/\b(save|bookmark)\b.{0,20}\bpost\b/i.test(task)) checks.push({ passed: Boolean(s.selected && s.bookmarks.includes(s.selected)), result: 'The opened post is saved.', missing: 'The opened post has not been saved.' });
+  } else if (s.site === 'soundcloud') {
+    if (/\bplay\b/i.test(task)) {
+      const track = /midnight/i.test(task) ? 'midnight' : /summer/i.test(task) ? 'summer' : /green room/i.test(task) ? 'greenroom' : '';
+      checks.push({ passed: Boolean(track && s.selected === track), result: 'The requested fictional track preview is playing.', missing: 'The requested track preview is not playing.' });
+    }
+    if (/\blike\b/i.test(task)) {
+      const track = /midnight/i.test(task) ? 'midnight' : /summer/i.test(task) ? 'summer' : /green room/i.test(task) ? 'greenroom' : '';
+      checks.push({ passed: Boolean(track && s.liked.includes(track)), result: 'The requested track is liked.', missing: 'The requested track is not liked.' });
+    }
+    if (/\bfollow\b/i.test(task)) {
+      const artist = /nova/i.test(task) ? 'Nova Vale' : /lena/i.test(task) ? 'Lena Parks' : '';
+      checks.push({ passed: Boolean(artist && s.followedTopics.includes(artist)), result: `You are following ${artist}.`, missing: 'The requested artist is not followed.' });
+    }
+  } else if (s.site === 'met-map') {
+    const room = /temple/i.test(task) ? 'temple' : /european paintings|impressionists/i.test(task) ? 'impressionists' : /modern/i.test(task) ? 'modern' : '';
+    if (/\bfloor 2\b/i.test(task)) checks.push({ passed: s.mapFloor === 2, result: 'Floor 2 is open on the map.', missing: 'Floor 2 is not open.' });
+    if (/\b(open|find|locate|show)\b/i.test(task) && room) checks.push({ passed: s.selected === room, result: 'The requested gallery is selected on the museum map.', missing: 'The requested gallery is not selected on the map.' });
   }
   if (!checks.length) return { supported: false, completed: false, answer: 'This task needs page-evidence verification.', reason: 'No deterministic state check applies to this task.' };
   const completed = checks.every((c) => c.passed), reason = completed ? 'All requested state changes were checked against the actual sandbox state.' : checks.filter((c) => !c.passed).map((c) => c.missing).join(' ');

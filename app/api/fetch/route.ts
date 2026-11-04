@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
   try { parsed = new URL(url); } catch { return NextResponse.json({ error: 'That does not look like a valid URL.' }, { status: 400 }); }
   if (!/^https?:$/.test(parsed.protocol) || isBlockedHost(parsed.hostname)) return NextResponse.json({ error: 'That address is not allowed.' }, { status: 400 });
   const saved = snapshotId(parsed.href);
-  if (saved && !refresh) {
+  if (saved) {
     try {
       const doc = await loadSavedGzip(saved);
       return new Response(doc, { headers: { 'Content-Type': 'application/json', 'Content-Encoding': 'gzip', 'X-PageGuide-Cache': 'SAVED' } });

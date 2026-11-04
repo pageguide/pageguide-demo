@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PROVIDERS, resolveKey } from '@/lib/providers';
 import { validatePageVerdict } from '@/lib/verification';
-import type { PageDoc, Provider } from '@/lib/types';
+import type { PageDoc, PageSelection, Provider } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -16,7 +16,7 @@ Return JSON: {"completed":boolean,"kind":"read"|"navigate"|"mutate","reason":"sh
 - Do not invent evidence or facts. Every check must quote a current heading/paragraph/listitem/quote block verbatim.`;
 
 export async function POST(req: NextRequest) {
-  let body: { provider?: Provider; model?: string; task?: string; doc?: PageDoc; history?: unknown[] };
+  let body: { provider?: Provider; model?: string; task?: string; doc?: PageDoc; selection?: PageSelection; history?: unknown[] };
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'Invalid verification request.' }, { status: 400 }); }
   const doc = body.doc;
   if (!body.task || !doc || !Array.isArray(doc.blocks)) return NextResponse.json({ error: 'Verification needs a task and observed page.' }, { status: 400 });
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
       body: JSON.stringify({ model: body.model || PROVIDERS[provider].defaultModel, temperature: 0, max_tokens: 800, response_format: { type: 'json_object' }, messages: [
         { role: 'system', content: SYSTEM },
-        { role: 'user', content: JSON.stringify({ task: String(body.task).slice(0, 1000), page: { url: doc.url, title: doc.title, blocks }, history: (Array.isArray(body.history) ? body.history : []).slice(-8) }) },
+        { role: 'user', content: JSON.stringify({ task: String(body.task).slice(0, 1000), selectedText: body.selection?.url === doc.url ? String(body.selection.text || '').slice(0, 4000) : undefined, page: { url: doc.url, title: doc.title, blocks }, history: (Array.isArray(body.history) ? body.history : []).slice(-8) }) },
       ] }),
     });
     if (!res.ok) return NextResponse.json({ error: `Page verification was unavailable (HTTP ${res.status}).` }, { status: 502 });

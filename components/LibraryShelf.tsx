@@ -1,18 +1,27 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { articleUrl } from '@/lib/library';
 import { sandboxUrl, type SandboxSite } from '@/lib/sandboxes';
+import { prefetchSavedPage } from '@/lib/saved-client';
 
 export const SANDBOX_TASKS: Record<SandboxSite, string[]> = {
   amazon: ['Add oranges to my cart', 'Buy oranges using demo checkout', 'Save coffee to my wishlist'],
   quora: ['Change my language to Spanish', 'Find and browse posts about gardening', 'Follow the Gardening topic', 'Publish a demo question about gardening'],
+  soundcloud: ['Play Midnight Signals', 'Like Midnight Signals', 'Follow Nova Vale'],
+  'met-map': ['Open the Temple of Dendur', 'Find European Paintings', 'Switch to Floor 2 and open Modern and Contemporary Art'],
 };
 
 export default function LibraryShelf() {
   const { library, pageError, loadUrl } = useStore();
   const [url, setUrl] = useState('');
+  useEffect(() => {
+    const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
+    if (connection?.saveData) return;
+    const timer = setTimeout(() => prefetchSavedPage('fetch-api'), 250);
+    return () => clearTimeout(timer);
+  }, []);
   return (
     <div className="pg-scroll h-full overflow-auto bg-[#fffaf6] dark:bg-night">
       <div className="mx-auto max-w-4xl px-5 py-8 md:px-8">
@@ -24,7 +33,7 @@ export default function LibraryShelf() {
           <h2 className="text-lg font-semibold text-ink dark:text-night-ink">Find <span className="ml-2 text-sm font-normal text-muted dark:text-night-muted">{library.articles.length} saved real websites</span></h2>
           <div className="mt-3 grid gap-3 xl:grid-cols-3">
             {library.articles.map((article, i) => (
-              <button key={article.id} onClick={() => void loadUrl(articleUrl(article.id, library))} className="library-card text-left">
+              <button key={article.id} onPointerEnter={() => prefetchSavedPage(article.id)} onFocus={() => prefetchSavedPage(article.id)} onClick={() => void loadUrl(articleUrl(article.id, library))} className="library-card text-left">
                 <span className="text-2xl" aria-hidden="true">{['⌘', '☀', '◎', '◷', '▦', '♜'][i]}</span>
                 <span className="mt-4 block text-xs font-semibold uppercase tracking-wide text-orange">{article.site}</span>
                 <span className="mt-1 block text-lg font-semibold">{article.title}</span>
@@ -36,13 +45,13 @@ export default function LibraryShelf() {
           <p className="mt-2 text-xs text-muted dark:text-night-muted">Original website HTML and styles, saved locally for speed. Scripts are removed for safety; these are snapshots, not live sessions.</p>
         </section>
         <section className="mt-8" aria-label="Guide interactive websites">
-          <h2 className="text-lg font-semibold text-ink dark:text-night-ink">Guide <span className="ml-2 text-sm font-normal text-muted dark:text-night-muted">2 isolated environments</span></h2>
+          <h2 className="text-lg font-semibold text-ink dark:text-night-ink">Guide <span className="ml-2 text-sm font-normal text-muted dark:text-night-muted">4 isolated environments</span></h2>
           <div className="mt-3 grid gap-3 md:grid-cols-2">
-            {(['amazon', 'quora'] as const).map((site) => (
+            {(['amazon', 'quora', 'soundcloud', 'met-map'] as const).map((site) => (
               <button key={site} onClick={() => void loadUrl(sandboxUrl(site))} className="library-card text-left">
-                <span className="text-2xl" aria-hidden="true">{site === 'amazon' ? '🍊' : '💬'}</span>
-                <span className="mt-3 block text-xl font-semibold">{site === 'amazon' ? 'Amazon' : 'Quora'} sandbox</span>
-                <span className="mt-2 block text-sm leading-relaxed text-muted dark:text-night-muted">{site === 'amazon' ? 'Shop, save a wishlist, check out with sample shipping, simulate payment, and manage orders.' : 'Browse fictional questions, answers and comments. Post, reply, vote, save, and follow topics.'}</span>
+                <span className="text-2xl" aria-hidden="true">{site === 'amazon' ? '🍊' : site === 'quora' ? '💬' : site === 'soundcloud' ? '☁' : '◈'}</span>
+                <span className="mt-3 block text-xl font-semibold">{site === 'amazon' ? 'Amazon' : site === 'quora' ? 'Quora' : site === 'soundcloud' ? 'SoundCloud' : 'The Met Map'} sandbox</span>
+                <span className="mt-2 block text-sm leading-relaxed text-muted dark:text-night-muted">{site === 'amazon' ? 'Shop, save a wishlist, check out with sample shipping, simulate payment, and manage orders.' : site === 'quora' ? 'Browse fictional questions, answers and comments. Post, reply, vote, save, and follow topics.' : site === 'soundcloud' ? 'Explore fictional artists, play previews, like tracks, and follow creators.' : 'Explore a fictional indoor museum map, switch floors, and open galleries.'}</span>
                 <span className="mt-4 block text-xs font-medium text-orange">Open interactive demo →</span>
               </button>
             ))}
