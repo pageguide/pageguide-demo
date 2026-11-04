@@ -20,15 +20,26 @@ test('Amazon uses scalable logo/cart artwork and keeps cart counts aligned on na
   await expect(logo.locator('span')).toHaveCount(0);
   await expect(site.locator('.az-cart-icon svg')).toHaveCount(1);
   await site.getByRole('button', { name: 'Add fresh oranges to cart', exact: true }).click();
-  await expect(site.locator('.az-cart-count')).toHaveText('1');
-  for (const width of [1440, 390]) {
-    await page.setViewportSize({ width, height: 960 });
-    const bounds = await logo.locator('img').boundingBox();
-    expect(bounds!.width / bounds!.height).toBeCloseTo(603 / 182, 1);
-    const icon = await site.locator('.az-cart-icon').boundingBox();
-    const count = await site.locator('.az-cart-count').boundingBox();
-    expect(count!.x).toBeGreaterThan(icon!.x);
-    expect(count!.x + count!.width).toBeLessThanOrEqual(icon!.x + icon!.width);
+  for (const total of [1, 4, 12, 120]) {
+    if (total === 4 || total === 12) await site.locator('[data-node-id="add-oranges"]').evaluate((button, n) => { for (let i = 0; i < n; i++) (button as HTMLButtonElement).click(); }, total === 4 ? 3 : 8);
+    if (total === 120) {
+      await site.locator('[data-node-id="add-oranges"]').evaluate(button => { for (let i = 0; i < 87; i++) (button as HTMLButtonElement).click(); });
+      await site.locator('[data-node-id="add-apples"]').evaluate(button => { for (let i = 0; i < 21; i++) (button as HTMLButtonElement).click(); });
+    }
+    await expect(site.locator('.az-cart-count')).toHaveText(String(total));
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 960 });
+      await site.evaluate(root => { root.scrollTop = 0; });
+      const bounds = await logo.locator('img').boundingBox();
+      expect(bounds!.width / bounds!.height).toBeCloseTo(603 / 182, 1);
+      const icon = await site.locator('.az-cart-icon').boundingBox();
+      const count = await site.locator('.az-cart-count').boundingBox();
+      const basket = await site.locator('[data-cart-basket]').boundingBox();
+      expect(count!.x).toBeGreaterThan(icon!.x);
+      expect(count!.x + count!.width).toBeLessThanOrEqual(icon!.x + icon!.width);
+      expect(count!.y + count!.height + 2).toBeLessThan(basket!.y);
+      if (total === 4 && width === 1440) await page.screenshot({ path: '/tmp/amazon-cart-four-fixed.png' });
+    }
   }
   await site.evaluate(root => { root.scrollTop = 0; });
   await page.screenshot({ path: '/tmp/amazon-header-fixed.png' });

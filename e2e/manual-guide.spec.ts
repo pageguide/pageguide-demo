@@ -20,6 +20,9 @@ async function expectArrow(page: Page, id: string) {
   expect(tip.x).toBeGreaterThanOrEqual(target!.x - 1);
   expect(tip.x).toBeLessThanOrEqual(target!.x + target!.width + 1);
   expect(Math.min(Math.abs(tip.y - target!.y), Math.abs(tip.y - target!.y - target!.height))).toBeLessThan(12);
+  const shaftEndY = await page.getByTestId('manual-guide-arrow').evaluate(el => { const path = el as unknown as SVGPathElement; return path.getPointAtLength(path.getTotalLength()).y; });
+  expect(Math.abs(shaftEndY - tip.y)).toBeCloseTo(15, 1);
+  await expect(page.locator('[data-guide-pointer] marker')).toHaveAttribute('refX', '8');
 }
 
 test('manual arrow follows each button, supports direct clicks and callout clicks, and performs each action only once', async ({ page }) => {

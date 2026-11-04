@@ -86,7 +86,10 @@ export default function GuidePointer() {
       const sx = clamp(cx, left + 20, left + width - 20), sy = above ? top + height : top;
       const tipY = clamp(above ? b.top - 8 : b.bottom + 8, bounds.top, bounds.bottom);
       const bend = above ? 28 : -28;
-      const next = { left, top, width, height, tipX: cx, tipY, path: `M${sx},${sy} C${sx},${sy + bend} ${cx},${tipY - bend} ${cx},${tipY}` };
+      // Stop the round-capped shaft inside the head, not at its point. Otherwise
+      // both shaft strokes protrude past the head as a second, rounded tip.
+      const shaftY = tipY - (above ? 15 : -15);
+      const next = { left, top, width, height, tipX: cx, tipY, path: `M${sx},${sy} C${sx},${sy + bend} ${cx},${shaftY - bend} ${cx},${shaftY}` };
       setLayout(previous => JSON.stringify(previous) === JSON.stringify(next) ? previous : next);
     };
     function schedule() { if (!raf) raf = requestAnimationFrame(measure); }
@@ -113,7 +116,7 @@ export default function GuidePointer() {
   if (!active || !layout) return null;
   return createPortal(<div data-guide-pointer data-target-id={targetId} className="pointer-events-none fixed inset-0 z-[45]" role="region" aria-label="Current manual step">
     <svg className="h-full w-full overflow-visible" aria-hidden="true" style={{ filter: 'drop-shadow(0 2px 3px #0004)' }}>
-      <defs><marker id={markerId} markerUnits="userSpaceOnUse" markerWidth="25" markerHeight="25" viewBox="0 0 25 25" refX="23" refY="12.5" orient="auto"><path d="M2 2L23 12.5L2 23L6 12.5Z" fill="#e96d2c" stroke="white" strokeWidth="2" strokeLinejoin="round" /></marker></defs>
+      <defs><marker id={markerId} markerUnits="userSpaceOnUse" markerWidth="25" markerHeight="25" viewBox="0 0 25 25" refX="8" refY="12.5" orient="auto"><path d="M2 2L23 12.5L2 23L6 12.5Z" fill="#e96d2c" stroke="white" strokeWidth="2" strokeLinejoin="round" /></marker></defs>
       <path d={layout.path} fill="none" stroke="white" strokeWidth="12" strokeLinecap="round" />
       <path data-testid="manual-guide-arrow" data-tip-x={layout.tipX} data-tip-y={layout.tipY} d={layout.path} fill="none" stroke="#e96d2c" strokeWidth="7" strokeLinecap="round" markerEnd={`url(#${markerId})`} />
     </svg>
