@@ -500,7 +500,7 @@ export const useStore = create<StoreState>((set, get) => ({
         const msg = e instanceof Error ? e.message : 'The agent failed.';
         if (cur?.id === id) {
           const finalRun: GuideRun = { ...cur, running: false, final: { status: 'Failed', answer: msg, reasoning: '' } };
-          set({ messages: [...get().messages, { id: msgId++, role: 'assistant', mode: 'guide', text: msg, guide: { run: finalRun, scratchpad: get().scratchpad } }], guideRun: null, scratchpad: [] });
+          set({ messages: [...get().messages, { id: msgId++, role: 'assistant', mode: 'guide', text: msg, guide: { run: finalRun, scratchpad: get().scratchpad } }], guideRun: null, scratchpad: [], busy: false });
         }
       } finally {
         if (get().guideRun?.id === id) set({ busy: false });
@@ -925,6 +925,7 @@ async function runAgent(
     messages: [...get().messages, { id: msgId++, role: 'assistant', mode: 'guide', text: finalAnswer, guide: { run: finalRun, scratchpad: selected } }],
     guideRun: null,
     scratchpad: [],
+    busy: false, // the run moved into a message, so the finally-block guard no longer clears this
   });
 }
 
