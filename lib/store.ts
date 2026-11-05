@@ -25,7 +25,7 @@ import type {
   SearchResult,
 } from './types';
 
-export type JourneyStatus = 'pending' | 'running' | 'done' | 'failed';
+export type JourneyStatus = 'pending' | 'running' | 'done' | 'failed' | 'cancelled';
 export interface GuideRun {
   id: number;
   task: string;
@@ -33,6 +33,7 @@ export interface GuideRun {
   journeyOpen: boolean;
   reasoningOpen: boolean;
   running: boolean;
+  paused?: boolean;
   final: { status: string; answer: string; reasoning: string; verification?: VerificationResult } | null;
   admin: { requests: AskDebug[]; usages: Usage[] };
 }
@@ -134,6 +135,9 @@ interface StoreState {
   toggleJourney: () => void;
   toggleReasoning: () => void;
   closeGuideRun: () => void;
+  pauseGuideRun: () => void;
+  resumeGuideRun: () => void;
+  cancelGuideRun: () => void;
   resolveConfirm: (ok: boolean) => void;
   setUiMode: (m: UiMode) => void;
   setComposerDraft: (text: string) => void;
@@ -700,6 +704,23 @@ export const useStore = create<StoreState>((set, get) => ({
     if (r) set({ guideRun: { ...r, reasoningOpen: !r.reasoningOpen } });
   },
   closeGuideRun: () => { agentAbort?.abort(); set({ guideRun: null, scratchpad: [], guide: null, pendingConfirm: null, busy: false }); },
+  pauseGuideRun: () => {
+    const run = get().guideRun;
+    if (run?.running) set({ guideRun: { ...run, paused: true } });
+  },
+  resumeGuideRun: () => {
+    const run = get().guideRun;
+    if (run?.running) set({ guideRun: { ...run, paused: false } });
+  },
+  cancelGuideRun: () => {
+    const run = get().guideRun;
+    if (!run?.running) return;
+    agentAbort?.abort();
+    const answer = 'Task cancelled. Any completed steps have not been undone.';
+    const finalRun: GuideRun = { ...run, running: false, paused: false, journey: run.journey.map(step => step.status === 'running' ? { ...step, status: 'cancelled' } : step), final: { status: 'Cancelled', answer, reasoning: '' } };
+    set({ messages: [...get().messages, { id: msgId++, role: 'assistant', mode: 'guide', text: answer, guide: { run: finalRun, scratchpad: get().scratchpad } }],
+      guideRun: null, scratchpad: [], guide: null, pendingConfirm: null, busy: false });
+  },
   resolveConfirm: (ok) => { confirmResolver?.(ok); },
   setUiMode: (m) => set({ uiMode: m }),
   setComposerDraft: (text) => set({ composerDraft: text }),
@@ -831,6 +852,12 @@ async function runAgent(
   const id = get().guideRun!.id;
   const signal = agentAbort!.signal;
   const alive = () => get().guideRun?.id === id && !signal.aborted;
+  // Hold model responses and approved actions until resumed. Cancellation releases
+  // this gate without applying an action or starting another model request.
+  const ready = async () => {
+    while (alive() && get().guideRun?.paused) await delay(100);
+    return alive();
+  };
   const site = get().doc?.sandbox;
   const initialState = site ? get().sandboxSessions[site] : undefined;
   const history: { instruction: string; action: string; observation: string }[] = [];
@@ -840,7 +867,7 @@ async function runAgent(
   await captureStep(get, set, 0, undefined, alive, selection);
   try {
     for (let t = 0; t < MAX_AGENT_STEPS; t++) {
-      if (!alive()) return;
+      if (!await ready()) return;
       const doc = get().doc;
       if (!doc) throw new Error('The page is no longer available.');
       const res = await fetch('/api/agent', {
@@ -849,7 +876,7 @@ async function runAgent(
         body: JSON.stringify({ provider: settings.provider, model: currentModel(settings), task, doc: { ...pageWithSelection(doc, doc.sandbox && history.length ? null : selection), html: undefined }, selection, history, evidence: get().scratchpad.map((e) => e.name) }),
       });
       const data = await res.json();
-      if (!alive()) return;
+      if (!await ready()) return;
       if (!res.ok) throw new Error(data?.error || 'The agent failed.');
       const { instruction, action, evidence, usage, debug } = data as { instruction: string; action: BrowserAction; evidence?: EvidenceRequest; usage?: Usage; debug?: AskDebug };
       const activeRun = get().guideRun;
@@ -872,7 +899,7 @@ async function runAgent(
           ? { mode: 'risk', kind: risk.kind, label: risk.label, title: risk.title, detail: risk.detail, instruction }
           : { mode: 'step', kind: 'step', label: 'step', title: 'Next step', detail: describeStep(action), instruction };
         const approved = await requestConfirm(set, prompt, signal);
-        if (!alive()) return;
+        if (!await ready()) return;
         if (!approved) {
           set({ guide: null });
           stopReason = risk ? `You declined the ${risk.label} step: “${instruction}”.` : `You stopped the run at: “${instruction}”.`;
@@ -884,7 +911,7 @@ async function runAgent(
       set({ guideRun: { ...run, journey: [...run.journey, { instruction, status: 'running' }] } });
       if (action.id) set({ guide: { steps: [{ id: action.id, instruction }], current: 0 } });
       await delay(120);
-      if (!alive()) return;
+      if (!await ready()) return;
       if (action.type === 'finish') {
         finished = true;
         set({ guide: null });
@@ -920,7 +947,7 @@ async function runAgent(
     setJourney(get, set, idx, 'failed');
     await captureStep(get, set, idx, undefined, alive, selection);
   }
-  if (!alive()) return;
+  if (!await ready()) return;
   set({ guide: null });
   const state = site ? get().sandboxSessions[site] : null;
   const known = state ? verifySandboxTask(task, state, get().library, initialState) : null;
@@ -947,7 +974,7 @@ async function runAgent(
       verified = { completed: false, reason, answer: `The task could not be verified: ${reason}`, source: 'unavailable' };
     }
   }
-  if (!alive()) return;
+  if (!await ready()) return;
   const completed = !failure && finished && verified.completed;
   const answer = verified.answer;
   const status = failure ? 'Failed' : completed ? 'Completed' : 'Incomplete';
@@ -974,7 +1001,7 @@ async function runAgent(
       }
     } catch { /* Keep the truthful, source-linked runtime fallback. */ }
   }
-  if (!alive()) return;
+  if (!await ready()) return;
   const run = get().guideRun!;
   const citedEvidence = selected.filter((e) => finalAnswer.includes(`[EV:${e.name}]`));
   const finalRun: GuideRun = { ...run, running: false, final: { status, answer: finalAnswer, reasoning: '', verification: verified } };

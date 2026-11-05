@@ -10,13 +10,14 @@ export function useSandboxControls(doc: PageDoc) {
   const guide = useStore(s => s.guide);
   const running = useStore(s => s.guideRun?.running);
   const pending = useStore(s => s.pendingConfirm);
+  const paused = useStore(s => s.guideRun?.paused);
   const resolveConfirm = useStore(s => s.resolveConfirm);
   const targetId = guide?.steps[guide.current]?.id;
-  const isAwaiting = (id: string) => !!pending && targetId === id;
+  const isAwaiting = (id: string) => !!pending && !paused && targetId === id;
   const act = (id: string, value?: string) => {
     const state = useStore.getState();
     if (state.guideRun?.running) {
-      if (state.pendingConfirm && state.guide?.steps[state.guide.current]?.id === id) state.resolveConfirm(true);
+      if (!state.guideRun.paused && state.pendingConfirm && state.guide?.steps[state.guide.current]?.id === id) state.resolveConfirm(true);
       return;
     }
     return dispatch(value === undefined ? { type: 'click', id } : { type: 'fill', id, value });
@@ -27,7 +28,7 @@ export function useSandboxControls(doc: PageDoc) {
     if (!block) return null;
     const ev = evidence.find(e => e.id === id);
     // In manual mode, the highlighted step control is clickable to approve/advance the step.
-    const awaiting = !!pending && targetId === id;
+    const awaiting = isAwaiting(id);
     return <button key={id} {...node(id)} className={`${className} ${node(id).className || ''}`.trim()} aria-label={block.text} disabled={running && !awaiting} onClick={() => awaiting ? resolveConfirm(true) : act(id)}>{children ?? block.text}{ev?.marker && <span className="sandbox-evidence-marker">Evidence {ev.marker}</span>}</button>;
   };
   return { act, node, control, running, targetId, isAwaiting };

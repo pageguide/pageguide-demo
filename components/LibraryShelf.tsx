@@ -11,7 +11,7 @@ export const SANDBOX_TASKS: Record<SandboxSite, string[]> = {
   amazon: ['Add oranges to my cart', 'Buy oranges using demo checkout', 'Save coffee to my wishlist'],
   quora: ['Change my language to Spanish', 'Find and browse posts about gardening', 'Follow the Gardening topic', 'Publish a demo question about gardening'],
   soundcloud: ['Play Midnight Signals', 'Like Midnight Signals', 'Follow Nova Vale'],
-  'met-map': ['Open the Temple of Dendur', 'Find the European Paintings galleries on Floor 2', 'Switch to Floor 2 and open Modern and Contemporary Art'],
+  'met-map': ['Open Arms and Armor', 'Find the European Paintings galleries on Floor 2', 'Switch to Floor 2 and open Modern and Contemporary Art'],
 };
 
 const FIND_EXAMPLE = 'When did the Berlin Wall fall?';
