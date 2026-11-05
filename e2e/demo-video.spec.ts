@@ -33,6 +33,6 @@ test('demo video supports metadata, byte ranges, and invalid range responses', a
   expect(gif.headers()['content-type']).toBe('image/gif');
   const header = await gif.body();
   expect(header.subarray(0, 3).toString()).toBe('GIF');
-  expect(header.readUInt16LE(6)).toBe(1920);
+  expect(header.readUInt16LE(6)).toBe(1440);
   expect(header.readUInt16LE(8)).toBe(1080);
 });

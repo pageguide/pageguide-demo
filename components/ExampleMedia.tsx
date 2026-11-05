@@ -101,8 +101,8 @@ export default function ExampleMedia({ mode, src, alt, width, height, type = 'im
 function SideCaptions({ captions, time, playingVideo, onNavigate }: { captions: DemoCaption[]; time: number; playingVideo: boolean; onNavigate: (start: number) => void }) {
   const steps = [
     { start: 0, title: 'Open the museum map', description: 'PageGuide navigates to the Met’s interactive map.' },
-    { start: 8, title: 'Search nearby cafés', description: 'Find dining options near the American Wing on Floor 1.' },
-    { start: 15, title: 'Show the café and evidence', description: 'Highlight the closest café and answer with an annotated screenshot.' },
+    { start: 6, title: 'Search nearby cafés', description: 'Find dining options near the American Wing on Floor 1.' },
+    { start: 10.3, title: 'Show the café and evidence', description: 'Highlight the closest café and answer with an annotated screenshot.' },
   ];
   const activeStep = time + .01 >= steps[2].start ? 2 : time + .01 >= steps[1].start ? 1 : 0;
   const narration = captions.find(caption => time >= caption.start && time < caption.end);
