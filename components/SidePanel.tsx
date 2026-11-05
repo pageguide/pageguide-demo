@@ -95,7 +95,8 @@ export default function SidePanel() {
     if (/^\/open\s+/i.test(t)) return void loadUrl(t);
     if (/^\/search\s+/i.test(t)) return void search(t);
     if (/^\/clear\b/i.test(t)) return clearChat();
-    void ask(t, uiMode === 'find' ? 'find' : 'guide');
+    // An explicit /find or /guide command overrides the selected mode.
+    void ask(t, /^\/(find|guide)\b/i.test(t) ? undefined : uiMode === 'find' ? 'find' : 'guide');
   };
 
   return (
@@ -330,9 +331,9 @@ function GuideCard({
             ))}
           </div>
         )}
-        {run.running && !run.paused && current && (
-          <div className="mt-2 flex items-center gap-2 border-t border-line pt-2 text-[11px] text-[#8c5a2b] dark:border-night-line dark:text-orange">
-            <span className="pg-spinner" /> {current.instruction}
+        {run.running && !run.paused && (
+          <div role="status" className="mt-2 flex items-center gap-2 border-t border-line pt-2 text-[11px] text-[#8c5a2b] dark:border-night-line dark:text-orange">
+            <span className="pg-spinner" /> {run.activity || current?.instruction || 'Preparing the next step…'}
           </div>
         )}
       </div>

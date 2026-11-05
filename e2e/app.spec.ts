@@ -180,7 +180,7 @@ test('admin mode exposes Guide request diagnostics and usage', async ({ page }) 
   await expect(page.getByTestId('guide-status')).toBeVisible();
   await page.getByRole('textbox', { name: 'Message PageGuide' }).fill('/admin admin2026pageguide');
   await page.getByRole('button', { name: 'Send', exact: true }).click();
-  await expect(page.getByTestId('admin-usage')).toContainText('240 tokens · ≈ $0.00020');
+  await expect(page.getByTestId('admin-usage')).toContainText('720 tokens · ≈ $0.00060'); // The false finish is retried twice, so three requests are recorded.
   await page.getByTestId('admin-inspector').getByText('Latest model request', { exact: true }).click();
   await page.getByTestId('admin-inspector').getByText('Input prompt', { exact: true }).click();
   await expect(page.getByTestId('admin-inspector')).toContainText('{"task":"Add oranges"}');

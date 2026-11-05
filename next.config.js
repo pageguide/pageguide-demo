@@ -11,6 +11,7 @@ const nextConfig = {
   // The legacy static demo lives under /legacy and is not imported by the Next build.
   experimental: {
     outputFileTracingIncludes: {
+      '/api/demo-video': ['./demo-video/*.mp4', './demo-video/*.webm', './demo-video/*.gif'],
       '/api/saved/*': ['./save-webpage/*.html', './public/saved/*'],
       '/api/fetch': ['./save-webpage/*.html', './public/saved/*'],
     },
