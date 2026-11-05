@@ -37,8 +37,8 @@ test('highlighting original HTML adds removable selection context and sends the 
     return r.fulfill({ json: { kind: 'find', answer: 'Shorter wavelengths scatter strongly [1].', citations: [{ marker: '1', id: body.selection?.id || 'n1', quote: body.selection?.text || doc.blocks[0].text }], visual: null } });
   });
   await page.goto('/');
-  await page.getByRole('textbox', { name: 'Custom website URL' }).fill(doc.url);
-  await page.getByRole('button', { name: 'Open website', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Search or enter website URL' }).fill(doc.url);
+  await page.getByRole('button', { name: 'Go', exact: true }).click();
   const frame = page.frameLocator('iframe');
   await expect(frame.locator('#late')).toBeVisible();
   await frame.locator('#late').evaluate((el) => {

@@ -43,8 +43,8 @@ async function mockFind(page: Page) {
 }
 async function loadPage(page: Page) {
   await page.goto('/');
-  await page.getByRole('textbox', { name: 'Custom website URL' }).fill('https://trails.example/guide');
-  await page.getByRole('button', { name: 'Open website', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Search or enter website URL' }).fill('https://trails.example/guide');
+  await page.getByRole('button', { name: 'Go', exact: true }).click();
   await expect(page.getByText('Weekend Trails Guide').first()).toBeVisible();
 }
 

@@ -100,8 +100,8 @@ test('manual arrows translate iframe coordinates and clicking the link approves 
     return r.fulfill({ json: { url, title: 'Example snapshot', html: url.endsWith('/details') ? '<html><body><h1>Details opened</h1></body></html>' : '<html><body style="padding:30px"><a data-pg-id="open-details" href="https://example.org/details">Open details</a></body></html>', blocks: url.endsWith('/details') ? [{ id: 'details', type: 'heading', text: 'Details opened' }] : [{ id: 'open-details', type: 'link', text: 'Open details', href: 'https://example.org/details', control: true }] } });
   });
   await page.route('**/api/verify', r => r.fulfill({ json: { completed: true, reason: 'Details snapshot is open.', answer: 'Details opened.' } }));
-  await page.getByRole('textbox', { name: 'Custom website URL' }).fill('https://example.org/start');
-  await page.getByRole('button', { name: 'Open website', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Search or enter website URL' }).fill('https://example.org/start');
+  await page.getByRole('button', { name: 'Go', exact: true }).click();
   await expect(page.frameLocator('iframe').getByRole('link', { name: 'Open details' })).toBeVisible();
   await page.getByRole('button', { name: 'Manual', exact: true }).click();
   await page.getByRole('textbox', { name: 'Message PageGuide' }).fill('Open the details link');
