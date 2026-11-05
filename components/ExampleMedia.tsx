@@ -57,6 +57,6 @@ function VideoCaptions({ src }: { src?: string }) {
 function VideoSources({ src }: { src: string }) {
   return <>
     <source src={src} type={'video/mp4; codecs="avc1.640028, mp4a.40.2"'} />
-    <source src={`${src}${src.includes('?') ? '&' : '?'}format=webm`} type={'video/webm; codecs="vp9, opus"'} />
+    <source src={src.replace(/\.mp4(?=\?|$)/, '.webm')} type={'video/webm; codecs="vp9, opus"'} />
   </>;
 }

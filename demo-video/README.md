@@ -12,8 +12,25 @@ The playground's GIF / Video switch uses the latest demo from `main`:
 
 The Guide card defaults to GIF. Select Video for sound and toggleable subtitles. The inline video is muted; enlarged playback enables sound by default. GIF has no audio.
 
-Media files use Git LFS. Run `git lfs pull` after cloning.
-The app streams MP4 from `/api/demo-video`, WebM from `/api/demo-video?format=webm`, and GIF from `/api/demo-video?format=gif`. Versioned URLs in the shelf prevent stale browser caches after replacing the demo.
+Source media in this folder uses Git LFS. Run `git lfs pull` when editing source assets.
+
+## Deployment
+
+The live app serves **regular Git binary copies** from `public/demo-media/`, not Git LFS files or a serverless media API. This avoids missing LFS downloads in deployment checkouts and large function-response limits:
+
+- `/demo-media/guide-latest.gif`
+- `/demo-media/guide-latest.mp4`
+- `/demo-media/guide-latest.webm`
+
+Versioned URLs prevent stale browser caches. Old `/api/demo-video` URLs redirect to these static assets. Next.js/static hosts provide byte-range playback and CDN delivery.
+
+After regenerating source media, run:
+
+```bash
+node scripts/prepare-demo-media.mjs
+```
+
+Commit the `public/demo-media/` copies as well as the LFS sources. The copies explicitly opt out of LFS in `.gitattributes`, so deployment does not need Git LFS for GIF/video playback.
 
 ## Regenerate with FFmpeg
 
