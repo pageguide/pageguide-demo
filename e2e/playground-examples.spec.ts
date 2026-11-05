@@ -13,6 +13,8 @@ test('playground shows the supplied Find image and playable Guide video', async 
   await expect(guide.getByText('The agent navigates the website and completes your goal.')).toBeVisible();
   await expect(guide.getByText('Agent runs the steps')).toBeVisible();
   await expect(guide.getByText('You approve each step')).toBeVisible();
+  await expect(guide.getByText('Query:', { exact: true })).toBeVisible();
+  await expect(guide.getByText('Find the nearest cafe to the American Wing On the first floor of the MET Museum', { exact: true })).toBeVisible();
   const findImage = find.getByRole('img');
   const formats = guide.getByRole('group', { name: 'Guide example format' });
   await expect(formats.getByRole('button', { name: 'GIF', exact: true })).toHaveAttribute('aria-pressed', 'true');
@@ -110,6 +112,8 @@ for (const mode of ['Find', 'Guide'] as const) {
     const media = mode === 'Find' ? overlay.getByRole('img') : overlay.getByLabel('Guide demonstration video', { exact: true });
     await expect(mode === 'Find' ? media : media.locator('source').first()).toHaveAttribute('src', mode === 'Find' ? '/examples/find-anchored-evidence.png' : '/demo-media/guide-latest.mp4?v=latest-256058da');
     if (mode === 'Guide') {
+      await expect(overlay.getByText('Query:', { exact: true })).toBeVisible();
+      await expect(overlay.getByText('Find the nearest cafe to the American Wing On the first floor of the MET Museum', { exact: true })).toBeVisible();
       expect(await media.evaluate((element: HTMLVideoElement) => element.muted)).toBe(false);
       await expect(media.locator('track')).toHaveCount(0);
       const captions = overlay.getByRole('complementary', { name: 'Side captions' });

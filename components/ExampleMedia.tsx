@@ -7,10 +7,10 @@ import { parseDemoCaptions, type DemoCaption } from '@/lib/demo-captions';
 interface Props {
   mode: 'Find' | 'Guide'; src: string; alt: string; width: number; height: number;
   type?: 'image' | 'video'; poster?: string; captionsSrc?: string; gifSrc?: string;
-  gifSeekSrc?: string; gifPlaybackRate?: number;
+  gifSeekSrc?: string; gifPlaybackRate?: number; query?: string;
 }
 
-export default function ExampleMedia({ mode, src, alt, width, height, type = 'image', poster, captionsSrc, gifSrc, gifSeekSrc, gifPlaybackRate = 1.5 }: Props) {
+export default function ExampleMedia({ mode, src, alt, width, height, type = 'image', poster, captionsSrc, gifSrc, gifSeekSrc, gifPlaybackRate = 1.5, query }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [useGif, setUseGif] = useState(Boolean(gifSrc));
   const [captions, setCaptions] = useState<DemoCaption[]>([]);
@@ -59,18 +59,19 @@ export default function ExampleMedia({ mode, src, alt, width, height, type = 'im
   return (
     <figure className="mt-3 flex min-w-0 flex-col justify-center gap-2 rounded-xl border border-orange-ring bg-orange-soft p-2 dark:border-night-line dark:bg-night-panel">
       <figcaption className="sr-only">{mode} example</figcaption>
+      {query && <p className="rounded-lg bg-white/80 px-3 py-2 text-sm leading-relaxed text-ink dark:bg-white/5 dark:text-night-ink"><span className="font-semibold text-orange">Query:</span>{' '}<span className="whitespace-pre-line">{query}</span></p>}
       {gifSrc && <div role="group" aria-label={`${mode} example format`} className="flex w-full items-center gap-1 text-xs">
         <button type="button" aria-pressed={useGif} onClick={() => { preview.current?.pause(); setUseGif(true); }} className={`rounded-md px-3 py-1.5 font-medium ${useGif ? 'bg-orange text-white' : 'text-muted hover:bg-white/60 dark:text-night-muted'}`}>GIF</button>
         <button type="button" aria-pressed={!useGif} onClick={() => setUseGif(false)} className={`rounded-md px-3 py-1.5 font-medium ${!useGif ? 'bg-orange text-white' : 'text-muted hover:bg-white/60 dark:text-night-muted'}`}>Video</button>
         <span className="ml-auto text-muted dark:text-night-muted">{useGif ? `${gifPlaybackRate}× · ${width} × ${height}` : 'Sound'} · Enlarge for steps</span>
       </div>}
       {isVideo ? <div className="relative min-w-0">
-        <video ref={preview} poster={poster} aria-label={alt} width={width} height={height} controls muted playsInline preload="metadata" className="block h-auto w-full rounded-lg bg-black">
+        <video ref={preview} poster={poster} aria-label={alt} width={width} height={height} controls muted playsInline preload="metadata" className="block h-auto max-h-64 w-full rounded-lg bg-black object-contain">
           <VideoSources src={src} />Your browser does not support video playback.
         </video>
         <button ref={trigger} type="button" aria-label={`Enlarge ${mode} example`} aria-haspopup="dialog" onClick={enlarge} className="absolute right-2 top-2 rounded-md bg-black/70 px-2 py-1 text-xs font-medium text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange">Enlarge ↗</button>
       </div> : <button ref={trigger} type="button" aria-label={`Enlarge ${mode} example`} aria-haspopup="dialog" onClick={enlarge} className="block min-w-0 w-full overflow-hidden rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange">
-        <img src={displayedSrc} alt={alt} width={width} height={height} loading="lazy" decoding="async" className="block h-auto w-full" />
+        <img src={displayedSrc} alt={alt} width={width} height={height} loading="lazy" decoding="async" className="block h-auto max-h-64 w-full object-contain" />
       </button>}
       {expanded && createPortal(
         <dialog ref={dialog} aria-label={`${mode} example`} onClose={() => setExpanded(false)} onCancel={() => setExpanded(false)} onClick={event => { if (event.target === event.currentTarget) setExpanded(false); }}
@@ -79,6 +80,7 @@ export default function ExampleMedia({ mode, src, alt, width, height, type = 'im
             <h2 className="text-sm font-semibold">{mode} example{seekableGif && ` · Seekable GIF preview · ${gifPlaybackRate}×`}</h2>
             <button type="button" autoFocus aria-label="Close example" onClick={() => setExpanded(false)} className="flex h-10 w-10 items-center justify-center rounded-lg hover:bg-orange-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange">✕</button>
           </div>
+          {query && <p className="mb-4 rounded-lg bg-orange-soft px-4 py-3 text-base leading-relaxed dark:bg-white/5"><span className="font-semibold text-orange">Query:</span>{' '}<span className="whitespace-pre-line">{query}</span></p>}
           <div className={captionsSrc ? 'grid items-start gap-5 md:grid-cols-[minmax(0,1fr)_18rem]' : ''}>
             {isVideo || seekableGif
               ? <video ref={player} poster={poster} aria-label={alt} width={width} height={height} controls autoPlay muted={seekableGif} loop={seekableGif} playsInline preload="metadata"
