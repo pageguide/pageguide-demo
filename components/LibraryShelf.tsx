@@ -21,28 +21,41 @@ const GUIDE_SITES: { id: SandboxSite; name: string; description: string }[] = [
   { id: 'met-map', name: 'The Met Map', description: 'Explore galleries and switch museum floors.' },
 ];
 
+export const FIND_PROMPTS: Record<string, string[]> = {
+  'roman-empire': ['When did the Roman Empire begin?', 'Which emperor divided the empire?'],
+  'blue-sky': ['What is Rayleigh scattering?', 'Why does the sky appear blue?'],
+  'web-accessibility': ['Why is web accessibility important?', 'Who benefits from accessible web design?'],
+  'cold-war': ['When did the Cold War begin?', 'What events led to its end?'],
+};
+
 export default function LibraryShelf() {
   const { library, pageError, loadUrl, uiMode, setUiMode } = useStore();
+  const [showAllFind, setShowAllFind] = useState(false);
+  const [showAllGuide, setShowAllGuide] = useState(false);
+  const findArticles = ['roman-empire', 'blue-sky', 'web-accessibility', 'cold-war'].flatMap((id) => library.articles.filter((article) => article.id === id));
 
   return (
     <div className="pg-scroll h-full overflow-auto bg-[#fffaf6] dark:bg-night">
-      <div className="mx-auto max-w-6xl px-5 py-4 md:px-8">
+      <div className="mx-auto flex min-h-full max-w-6xl flex-col px-5 py-2 md:px-8">
         <p className="text-sm font-medium text-orange">TRY PAGEGUIDE · FIND ANSWERS & COMPLETE TASKS</p>
         {pageError && <p role="alert" className="mt-4 rounded-xl border border-orange-ring bg-orange-soft p-3 text-sm text-[#8c4f29]">{pageError}</p>}
-        <div className="mt-3 grid gap-5 xl:grid-cols-2 xl:gap-y-0">
+        <div className="mt-3 grid flex-1 gap-5 xl:grid-cols-2 xl:grid-rows-[auto_auto_minmax(0,1fr)_auto_auto] xl:gap-y-0">
           <section aria-label="Find saved websites" className="xl:row-span-5 xl:grid xl:grid-rows-subgrid">
             <h2 className="text-lg font-semibold text-ink dark:text-night-ink">Find</h2>
             <p className="mt-1 text-base font-medium leading-snug text-ink dark:text-night-ink">The agent finds information and returns answer with evidence on the page.</p>
             <FindExample />
-            <h3 className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-muted dark:text-night-muted">Or open a page to ask your own question</h3>
-            <div className="grid auto-rows-fr gap-2 sm:grid-cols-2">
-              {['roman-empire', 'blue-sky', 'web-accessibility', 'cold-war'].flatMap((id) => library.articles.filter((article) => article.id === id)).map((article) => (
-                <button key={article.id} onPointerEnter={() => prefetchSavedPage(article.id)} onFocus={() => prefetchSavedPage(article.id)} onClick={() => { setUiMode('find'); void loadUrl(articleUrl(article.id, library)); }} className="library-card library-card--compact text-left">
-                  <span className="block text-[11px] font-semibold uppercase tracking-wide text-orange">{article.site}</span>
-                  <span className="mt-0.5 block truncate text-sm font-semibold leading-snug" title={article.title}>{article.title}</span>
-                  <span className="mt-2 block text-xs font-medium text-orange">Open →</span>
-                </button>
-              ))}
+            <h3 className="mb-2 mt-2 text-xs font-semibold uppercase tracking-wide text-muted dark:text-night-muted">Or open a page to ask your own question</h3>
+            <div>
+              <div className="grid auto-rows-fr gap-2 sm:grid-cols-2">
+                {(showAllFind ? findArticles : findArticles.slice(0, 2)).map((article) => (
+                  <button key={article.id} type="button" onPointerEnter={() => prefetchSavedPage(article.id)} onFocus={() => prefetchSavedPage(article.id)} onClick={() => { setUiMode('find'); void loadUrl(articleUrl(article.id, library)); }} className="library-card library-card--compact text-left">
+                      <span className="block text-[11px] font-semibold uppercase tracking-wide text-orange">{article.site}</span>
+                      <span className="mt-0.5 block truncate text-sm font-semibold leading-snug" title={article.title}>{article.title}</span>
+                      <span className="mt-2 block text-xs font-medium text-orange">Open →</span>
+                  </button>
+                ))}
+              </div>
+              {findArticles.length > 2 && <button type="button" aria-expanded={showAllFind} onClick={() => setShowAllFind((shown) => !shown)} className="mt-2 text-xs font-semibold text-orange hover:underline">{showAllFind ? 'Show fewer examples' : 'More examples'}</button>}
             </div>
           </section>
           <section aria-label="Guide interactive websites" className="xl:row-span-5 xl:grid xl:grid-rows-subgrid">
@@ -55,15 +68,18 @@ export default function LibraryShelf() {
               </dl>
             </div>
             <ExampleMedia mode="Guide" query={'Find the nearest cafe to the American Wing\nOn the first floor of the MET Museum'} type="video" src="/demo-media/guide-latest.mp4?v=latest-256058da" gifSrc="/demo-media/guide-latest.gif?v=latest-256058da-15x" gifSeekSrc="/demo-media/guide-gif-seekable.mp4?v=latest-256058da-15x" gifPlaybackRate={1.5} poster="/examples/guide-demo-poster.jpg" captionsSrc="/examples/guide-demo.en.vtt" alt="Guide demonstration video" width={1440} height={1080} />
-            <h3 className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-muted dark:text-night-muted">Or open a demo website to try your own task</h3>
-            <div className="grid auto-rows-fr gap-2 sm:grid-cols-2">
-              {GUIDE_SITES.map((site) => (
-                <button key={site.id} onClick={() => { if (uiMode === 'find') setUiMode('auto'); void loadUrl(sandboxUrl(site.id)); }} className="library-card library-card--compact text-left">
-                  <span className="block text-sm font-semibold leading-snug">{site.name}</span>
-                  <span className="mt-1 block truncate text-xs leading-snug text-muted dark:text-night-muted" title={site.description}>{site.description}</span>
-                  <span className="mt-2 block text-xs font-medium text-orange">Open →</span>
-                </button>
-              ))}
+            <h3 className="mb-2 mt-2 text-xs font-semibold uppercase tracking-wide text-muted dark:text-night-muted">Or open a demo website to try your own task</h3>
+            <div>
+              <div className="grid auto-rows-fr gap-2 sm:grid-cols-2">
+                {(showAllGuide ? GUIDE_SITES : GUIDE_SITES.slice(0, 2)).map((site) => (
+                  <button key={site.id} onClick={() => { if (uiMode === 'find') setUiMode('auto'); void loadUrl(sandboxUrl(site.id)); }} className="library-card library-card--compact text-left">
+                    <span className="block text-sm font-semibold leading-snug">{site.name}</span>
+                    <span className="mt-1 block truncate text-xs leading-snug text-muted dark:text-night-muted" title={site.description}>{site.description}</span>
+                    <span className="mt-2 block text-xs font-medium text-orange">Open →</span>
+                  </button>
+                ))}
+              </div>
+              <button type="button" aria-expanded={showAllGuide} onClick={() => setShowAllGuide((shown) => !shown)} className="mt-2 text-xs font-semibold text-orange hover:underline">{showAllGuide ? 'Show fewer examples' : 'More examples'}</button>
             </div>
           </section>
         </div>
@@ -82,15 +98,15 @@ function FindExample() {
       <p className="rounded-lg bg-white/80 px-3 py-2 text-sm leading-relaxed text-ink dark:bg-white/5 dark:text-night-ink">
         <span className="font-semibold text-orange">Query:</span>{' '}Which stream emerges from Nevado Mismi before eventually contributing to the Apurimac River system?
       </p>
-      <div className="grid min-w-0 grid-cols-2 gap-3">
+      <div className="grid min-w-0 flex-1 content-center grid-cols-2 gap-3">
         <div className="flex min-w-0 items-center">
-          <p className="min-w-0 text-left text-[clamp(.75rem,1.35vw,1.1rem)] leading-snug text-ink dark:text-night-ink">
+          <p className="min-w-0 text-left text-[clamp(.75rem,1vw,1rem)] leading-snug text-ink dark:text-night-ink">
             <mark className={highlight([1])}>Nevado Mismi</mark> peak, located roughly 160 km (99 mi) west of Lake Titicaca. From that point, <mark className={highlight([2, 3])}>Quebrada Carhuasanta</mark> emerges from Nevado Mismi, ...becomes <mark className={highlight([4, 5])}>Río Hornillos</mark> and eventually joins the <mark className={highlight([6])}>Río Apurímac</mark>.
           </p>
         </div>
-        <div className="min-w-0 rounded-lg bg-[#1f2636] text-[clamp(.75rem,1.25vw,1.05rem)] leading-snug text-[#e7eaf0]">
-          <div className="border-b border-white/80 px-3 py-2 font-semibold text-orange">🍊 PageGuide</div>
-          <p className="p-3">The stream that emerges from <strong className="text-[#9fc5ff]">Nevado Mismi</strong> <Citation number={1} active={activeCitation === 1} onClick={setActiveCitation} /> is <strong className="text-[#9fc5ff]">Quebrada Carhuasanta</strong> <Citation number={2} active={activeCitation === 2} onClick={setActiveCitation} />. It joins <strong className="text-[#9fc5ff]">Quebrada Apacheta</strong> <Citation number={3} active={activeCitation === 3} onClick={setActiveCitation} /> to form the <strong className="text-[#9fc5ff]">Río Lloqueta</strong> <Citation number={4} active={activeCitation === 4} onClick={setActiveCitation} />, which then becomes the <strong className="text-[#9fc5ff]">Río Hornillos</strong> <Citation number={5} active={activeCitation === 5} onClick={setActiveCitation} /> before eventually joining the <strong className="text-[#9fc5ff]">Río Apurímac</strong> <Citation number={6} active={activeCitation === 6} onClick={setActiveCitation} />.</p>
+        <div className="min-w-0 rounded-lg bg-[#1f2636] text-[clamp(.75rem,1vw,1rem)] leading-snug text-[#e7eaf0]">
+          <div className="border-b border-white/80 px-3 py-2 text-sm font-semibold text-orange">🍊 PageGuide</div>
+          <p className="p-2">The stream that emerges from <strong className="text-[#9fc5ff]">Nevado Mismi</strong> <Citation number={1} active={activeCitation === 1} onClick={setActiveCitation} /> is <strong className="text-[#9fc5ff]">Quebrada Carhuasanta</strong> <Citation number={2} active={activeCitation === 2} onClick={setActiveCitation} />. It joins <strong className="text-[#9fc5ff]">Quebrada Apacheta</strong> <Citation number={3} active={activeCitation === 3} onClick={setActiveCitation} /> to form the <strong className="text-[#9fc5ff]">Río Lloqueta</strong> <Citation number={4} active={activeCitation === 4} onClick={setActiveCitation} />, which then becomes the <strong className="text-[#9fc5ff]">Río Hornillos</strong> <Citation number={5} active={activeCitation === 5} onClick={setActiveCitation} /> before eventually joining the <strong className="text-[#9fc5ff]">Río Apurímac</strong> <Citation number={6} active={activeCitation === 6} onClick={setActiveCitation} />.</p>
         </div>
       </div>
     </figure>

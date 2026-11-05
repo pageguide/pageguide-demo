@@ -7,6 +7,7 @@ import LibraryShelf from '@/components/LibraryShelf';
 import SandboxView from '@/components/SandboxView';
 import GuidePointer from '@/components/GuidePointer';
 import SandboxTaskBar from '@/components/SandboxTaskBar';
+import FindTaskBar from '@/components/FindTaskBar';
 import BrowserAddressBar from '@/components/BrowserAddressBar';
 import type { Block } from '@/lib/types';
 
@@ -83,6 +84,7 @@ export default function ExtensionSurface() {
         </div>
 
         {doc?.sandbox && browserView === 'page' && <SandboxTaskBar site={doc.sandbox} />}
+        {doc && !doc.sandbox && browserView === 'page' && <FindTaskBar url={doc.url} />}
         {doc && !doc.sandbox && browserView === 'page' && <p className="border-b border-line px-3 py-2 text-xs text-muted dark:border-night-line dark:text-night-muted">{doc.saved ? `Original website HTML · saved ${doc.savedAt ? new Date(doc.savedAt).toLocaleDateString() : 'locally'} · scripts disabled` : 'External snapshot · links and text fields work; site scripts and form submissions are disabled'}</p>}
         {/* body */}
         <div data-pageguide-page className="min-h-0 flex-1">

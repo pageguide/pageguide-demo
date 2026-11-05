@@ -57,7 +57,7 @@ export default function ExampleMedia({ mode, src, alt, width, height, type = 'im
   }, [expanded]);
 
   return (
-    <figure className="mt-3 flex min-w-0 flex-col justify-center gap-2 rounded-xl border border-orange-ring bg-orange-soft p-2 dark:border-night-line dark:bg-night-panel">
+    <figure className={`mt-3 flex min-w-0 flex-col justify-start gap-2 rounded-xl border border-orange-ring bg-orange-soft dark:border-night-line dark:bg-night-panel ${mode === 'Find' ? 'h-full overflow-hidden' : 'p-2'}`}>
       <figcaption className="sr-only">{mode} example</figcaption>
       {query && <p className="rounded-lg bg-white/80 px-3 py-2 text-sm leading-relaxed text-ink dark:bg-white/5 dark:text-night-ink"><span className="font-semibold text-orange">Query:</span>{' '}<span className="whitespace-pre-line">{query}</span></p>}
       {gifSrc && <div role="group" aria-label={`${mode} example format`} className="flex w-full items-center gap-1 text-xs">
@@ -65,13 +65,13 @@ export default function ExampleMedia({ mode, src, alt, width, height, type = 'im
         <button type="button" aria-pressed={!useGif} onClick={() => setUseGif(false)} className={`rounded-md px-3 py-1.5 font-medium ${!useGif ? 'bg-orange text-white' : 'text-muted hover:bg-white/60 dark:text-night-muted'}`}>Video</button>
         <span className="ml-auto text-muted dark:text-night-muted">{useGif ? `${gifPlaybackRate}× · ${width} × ${height}` : 'Sound'} · Enlarge for steps</span>
       </div>}
-      {isVideo ? <div className="relative min-w-0">
-        <video ref={preview} poster={poster} aria-label={alt} width={width} height={height} controls muted playsInline preload="metadata" className="block h-auto max-h-64 w-full rounded-lg bg-black object-contain">
+      {isVideo ? <div className={`relative min-w-0 ${mode === 'Guide' ? 'mx-auto aspect-[4/3] w-full max-w-[48dvh]' : ''}`}>
+        <video ref={preview} poster={poster} aria-label={alt} width={width} height={height} controls muted playsInline preload="metadata" className={`block w-full rounded-lg bg-black object-contain ${mode === 'Guide' ? 'h-full' : 'h-auto'}`}>
           <VideoSources src={src} />Your browser does not support video playback.
         </video>
         <button ref={trigger} type="button" aria-label={`Enlarge ${mode} example`} aria-haspopup="dialog" onClick={enlarge} className="absolute right-2 top-2 rounded-md bg-black/70 px-2 py-1 text-xs font-medium text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange">Enlarge ↗</button>
-      </div> : <button ref={trigger} type="button" aria-label={`Enlarge ${mode} example`} aria-haspopup="dialog" onClick={enlarge} className="block min-w-0 w-full overflow-hidden rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange">
-        <img src={displayedSrc} alt={alt} width={width} height={height} loading="lazy" decoding="async" className="block h-auto max-h-64 w-full object-contain" />
+      </div> : <button ref={trigger} type="button" aria-label={`Enlarge ${mode} example`} aria-haspopup="dialog" onClick={enlarge} className={`block min-w-0 w-full overflow-hidden rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange ${mode === 'Guide' ? 'mx-auto aspect-[4/3] max-w-[48dvh]' : ''}`}>
+        <img src={displayedSrc} alt={alt} width={width} height={height} loading="lazy" decoding="async" className={`block w-full object-contain ${mode === 'Guide' ? 'h-full' : 'h-auto'}`} />
       </button>}
       {expanded && createPortal(
         <dialog ref={dialog} aria-label={`${mode} example`} onClose={() => setExpanded(false)} onCancel={() => setExpanded(false)} onClick={event => { if (event.target === event.currentTarget) setExpanded(false); }}

@@ -5,7 +5,7 @@ test.beforeEach(async ({ page }) => {
   await page.route('**/api/library', route => route.fulfill({ json: { library, source: 'bundled' } }));
 });
 
-test('playground shows the supplied Find image and playable Guide video', async ({ page }) => {
+test('playground shows the responsive Find example and playable Guide video', async ({ page }) => {
   await page.goto('/');
   const find = page.getByRole('region', { name: 'Find saved websites' });
   const guide = page.getByRole('region', { name: 'Guide interactive websites' });
@@ -15,7 +15,6 @@ test('playground shows the supplied Find image and playable Guide video', async 
   await expect(guide.getByText('You approve each step')).toBeVisible();
   await expect(guide.getByText('Query:', { exact: true })).toBeVisible();
   await expect(guide.getByText('Find the nearest cafe to the American Wing On the first floor of the MET Museum', { exact: true })).toBeVisible();
-  const findImage = find.getByRole('img');
   const formats = guide.getByRole('group', { name: 'Guide example format' });
   await expect(formats.getByRole('button', { name: 'GIF', exact: true })).toHaveAttribute('aria-pressed', 'true');
   const gif = guide.getByRole('img');
@@ -26,9 +25,13 @@ test('playground shows the supplied Find image and playable Guide video', async 
   await expect.poll(() => gif.evaluate((element: HTMLImageElement) => element.naturalWidth), { timeout: 20000 }).toBe(1440);
   await formats.getByRole('button', { name: 'Video', exact: true }).click();
   const video = guide.getByLabel('Guide demonstration video', { exact: true });
-  await expect(findImage).toHaveAttribute('src', '/examples/find-anchored-evidence.png');
-  await expect(findImage).toBeVisible();
-  await expect.poll(() => findImage.evaluate((element: HTMLImageElement) => element.naturalWidth), { timeout: 20000 }).toBeGreaterThan(0);
+  await expect(find.getByText('Which stream emerges from Nevado Mismi before eventually contributing to the Apurimac River system?')).toBeVisible();
+  await expect(find.getByText('Quebrada Carhuasanta', { exact: true }).first()).toBeVisible();
+  const quebrada = find.getByText('Quebrada Carhuasanta', { exact: true }).first();
+  await find.getByRole('button', { name: 'Highlight source for citation 2' }).click();
+  await expect(quebrada).toHaveClass(/bg-\[#ffe29d\]/);
+  await find.getByRole('button', { name: 'Highlight source for citation 3' }).click();
+  await expect(quebrada).toHaveClass(/bg-\[#ffe29d\]/);
   await expect(video.locator('source').first()).toHaveAttribute('src', '/demo-media/guide-latest.mp4?v=latest-256058da');
   await expect(video.locator('source').nth(1)).toHaveAttribute('src', '/demo-media/guide-latest.webm?v=latest-256058da');
   await expect(video).toHaveAttribute('controls', '');
@@ -42,13 +45,16 @@ test('playground shows the supplied Find image and playable Guide video', async 
   await expect(sideCaptions).toHaveCount(0);
   await expect(page.getByRole('textbox', { name: 'Search or enter website URL' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Go', exact: true })).toHaveCount(0);
+  await expect(page.locator('.library-card')).toHaveCount(4);
+  await find.getByRole('button', { name: 'More examples' }).click();
+  await guide.getByRole('button', { name: 'More examples' }).click();
   await expect(page.locator('.library-card')).toHaveCount(8);
   await expect(find.locator('.library-card').first()).toContainText('Roman Empire');
   const colors = await page.locator('.library-card').getByText('Open →', { exact: true }).evaluateAll(labels => labels.map(label => getComputedStyle(label).color));
   expect(new Set(colors).size).toBe(1);
 });
 
-test('media examples and website rows align and fit on desktop', async ({ page }) => {
+test('Find and Guide previews fill the desktop shelf without scrolling', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/');
   const find = page.getByRole('region', { name: 'Find saved websites' });
@@ -57,17 +63,35 @@ test('media examples and website rows align and fit on desktop', async ({ page }
   const right = await guide.locator('figure').boundingBox();
   expect(left!.y).toBeCloseTo(right!.y, 0);
   expect(left!.height).toBeCloseTo(right!.height, 0);
+  const guideImage = await guide.getByRole('img').boundingBox();
+  expect(guideImage!.height).toBeGreaterThan(256);
   const modes = await guide.locator('dl').boundingBox();
   expect(modes!.y + modes!.height).toBeLessThan(right!.y);
   const shelf = page.locator('.pg-scroll').filter({ has: find });
-  const dimensions = await shelf.evaluate(element => ({ content: element.scrollHeight, viewport: element.clientHeight }));
-  expect(dimensions.content).toBeLessThanOrEqual(dimensions.viewport + 1);
-  for (let i = 0; i < 4; i++) {
-    const a = await find.locator('.library-card').nth(i).boundingBox();
-    const b = await guide.locator('.library-card').nth(i).boundingBox();
-    expect(a!.y).toBeCloseTo(b!.y, 0);
-    expect(a!.height).toBeCloseTo(b!.height, 0);
+  const dimensions = await shelf.evaluate(element => ({ width: element.scrollWidth, viewportWidth: element.clientWidth, height: element.scrollHeight, viewportHeight: element.clientHeight }));
+  expect(dimensions.width).toBeLessThanOrEqual(dimensions.viewportWidth + 1);
+  expect(dimensions.height).toBeLessThanOrEqual(dimensions.viewportHeight + 1);
+});
+
+test('Find cards open pages directly, with example requests above the article', async ({ page }) => {
+  await page.goto('/');
+  const find = page.getByRole('region', { name: 'Find saved websites' });
+  const guide = page.getByRole('region', { name: 'Guide interactive websites' });
+  const firstFindCard = find.locator('.library-card').first();
+  await expect(firstFindCard).toContainText('Open →');
+  await expect(find.getByText('When did the Roman Empire begin?')).toHaveCount(0);
+  for (const section of [find, guide]) {
+    const lastCard = await section.locator('.library-card').last().boundingBox();
+    const more = await section.getByRole('button', { name: 'More examples' }).boundingBox();
+    expect(more!.y).toBeGreaterThanOrEqual(lastCard!.y + lastCard!.height);
   }
+  await firstFindCard.click();
+  await expect(page.getByTestId('browser-location')).toContainText('Roman Empire');
+  const examples = page.getByRole('toolbar', { name: 'Find example requests' });
+  await expect(examples.getByRole('button')).toHaveCount(2);
+  await expect(examples.getByRole('button', { name: 'Find: When did the Roman Empire begin?' })).toBeVisible();
+  await examples.getByRole('button', { name: 'Find: When did the Roman Empire begin?' }).click();
+  await expect(page.getByRole('textbox', { name: 'Message PageGuide' })).toHaveValue('When did the Roman Empire begin?');
 });
 
 for (const format of ['GIF', 'Video'] as const) {
@@ -101,7 +125,7 @@ for (const format of ['GIF', 'Video'] as const) {
   });
 }
 
-for (const mode of ['Find', 'Guide'] as const) {
+for (const mode of ['Guide'] as const) {
   test(`${mode} media opens an overlay and closes with Escape or the close button`, async ({ page }) => {
     await page.goto('/');
     if (mode === 'Guide') await page.getByRole('button', { name: 'Video', exact: true }).click();
@@ -109,8 +133,8 @@ for (const mode of ['Find', 'Guide'] as const) {
     await button.click();
     const overlay = page.getByRole('dialog', { name: `${mode} example`, exact: true });
     await expect(overlay).toBeVisible();
-    const media = mode === 'Find' ? overlay.getByRole('img') : overlay.getByLabel('Guide demonstration video', { exact: true });
-    await expect(mode === 'Find' ? media : media.locator('source').first()).toHaveAttribute('src', mode === 'Find' ? '/examples/find-anchored-evidence.png' : '/demo-media/guide-latest.mp4?v=latest-256058da');
+    const media = overlay.getByLabel('Guide demonstration video', { exact: true });
+    await expect(media.locator('source').first()).toHaveAttribute('src', '/demo-media/guide-latest.mp4?v=latest-256058da');
     if (mode === 'Guide') {
       await expect(overlay.getByText('Query:', { exact: true })).toBeVisible();
       await expect(overlay.getByText('Find the nearest cafe to the American Wing On the first floor of the MET Museum', { exact: true })).toBeVisible();
