@@ -43,8 +43,8 @@ for (const outcome of ['completed', 'unmet', 'unavailable'] as const) {
     await page.route('**/api/verify', (r) => outcome === 'unavailable' ? r.fulfill({ status: 502, json: { error: 'Page verification timed out.' } }) : r.fulfill({ json: { completed: outcome === 'completed', reason: outcome === 'completed' ? 'Supporting quotations exist on the observed page.' : 'The requested comparison is not present on this page.', answer: outcome === 'completed' ? doc.blocks[0].text : 'The requested comparison was not found.' } }));
     await page.route('**/api/summarize', (r) => { const data = r.request().postDataJSON(); return r.fulfill({ json: { answer: `${data.outcome} ${data.evidence.map((e: any) => `[EV:${e.name}]`).join(' ')}` } }); });
     await page.goto('/');
-    await page.getByRole('textbox', { name: 'Custom website URL' }).fill(doc.url);
-    await page.getByRole('button', { name: 'Open website', exact: true }).click();
+    await page.getByRole('textbox', { name: 'Search or enter website URL' }).fill(doc.url);
+    await page.getByRole('button', { name: 'Go', exact: true }).click();
     await expect(page.frameLocator('iframe').locator('h1')).toBeVisible();
     await page.getByRole('textbox', { name: 'Message PageGuide' }).fill('/guide Explain the Fetch API from this page');
     await page.getByRole('button', { name: 'Send', exact: true }).click();

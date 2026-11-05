@@ -7,6 +7,9 @@ const clean = (text: string | undefined | null) => (text || '').replace(/\s+/g, 
 export function extractPage(html: string, base: URL): PageDoc {
   const $ = cheerio.load(html);
   $('script, noscript, template, iframe, object, embed, meta[http-equiv="refresh"]').remove();
+  // MDN dropdowns depend on scripts that are disabled in the snapshot iframe. Without
+  // them, their saved panels render permanently open instead of responding to the nav.
+  $('mdn-dropdown .menu__panel').remove();
   $('*').each((_, el) => {
     const e = el as { attribs?: Record<string, string> };
     if (e.attribs) for (const a of Object.keys(e.attribs)) {

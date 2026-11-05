@@ -282,7 +282,13 @@ export function applySandboxAction(s: SandboxState, action: BrowserAction, lib: 
       const topic = allPosts(s, lib).map((p) => p.topic).find((t) => topicId(t) === id.slice(id.startsWith('topic-') ? 6 : 7))!;
       if (id.startsWith('topic-')) { n.query = qt(n.language, topic); n.view = 'home'; } else { n.followedTopics = toggle(s.followedTopics, topic); n.notice = 'Followed topics updated.'; }
     } else if (id.startsWith('product-')) { n.view = 'product'; n.selected = id.slice(8); }
-    else if (id.startsWith('wish-')) { n.wishlist = toggle(s.wishlist, id.slice(5)); n.notice = 'Wishlist updated.'; }
+    else if (id.startsWith('wish-')) {
+      const pid = id.slice(5), adding = !s.wishlist.includes(pid), name = lib.products.find((p) => p.id === pid)?.name || pid;
+      n.wishlist = toggle(s.wishlist, pid);
+      // On add, open the wishlist so the result is visible (and screenshottable as evidence).
+      if (adding) { n.view = 'wishlist'; n.selected = ''; n.query = ''; n.notice = `${name} saved to your wishlist.`; }
+      else n.notice = `${name} removed from your wishlist.`;
+    }
     else {
       const match = /^(add|increase|decrease|remove)-(.+)$/.exec(id);
       if (!match) throw new Error('Unsupported sandbox action.');

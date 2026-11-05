@@ -30,6 +30,27 @@ test('Amazon manual controls change cart quantities and sandbox sessions stay is
   await expect(site.locator('[data-node-id="current-state"]')).toContainText('Cart contents: empty');
 });
 
+test('Back returns a first visited page to the library', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: /Amazon sandbox/ }).click();
+  const back = page.getByRole('button', { name: 'Back', exact: true });
+  await expect(back).toBeEnabled();
+  await back.click();
+  await expect(page.getByRole('region', { name: 'Find saved websites', exact: true })).toBeVisible();
+});
+
+test('opening a new site from the library starts fresh history', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: /Amazon sandbox/ }).click();
+  const back = page.getByRole('button', { name: 'Back', exact: true });
+  await expect(back).toBeEnabled();
+  await back.click();
+  await page.getByRole('button', { name: /Quora sandbox/ }).click();
+  await expect(back).toBeEnabled();
+  await back.click();
+  await expect(page.getByRole('region', { name: 'Find saved websites', exact: true })).toBeVisible();
+});
+
 test('Quora manual settings, search, browsing, upvote, and back navigation work', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: /Quora sandbox/ }).click();
@@ -157,13 +178,13 @@ test('custom URL loads are cached in-session and refresh bypasses the cache', as
     return r.fulfill({ json: { url: 'https://custom.example/', title: 'Custom website', blocks: [{ id: 'custom-title', type: 'heading', text: 'Custom website', level: 1 }] } });
   });
   await page.goto('/');
-  await page.getByRole('textbox', { name: 'Custom website URL' }).fill('https://custom.example/');
-  await page.getByRole('button', { name: 'Open website', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Search or enter website URL' }).fill('https://custom.example/');
+  await page.getByRole('button', { name: 'Go', exact: true }).click();
   await expect(page.locator('[data-node-id="custom-title"]')).toBeVisible();
   await page.getByRole('button', { name: 'Open library', exact: true }).click();
   await expect(page.getByRole('button', { name: 'custom.example', exact: true })).toHaveCount(0);
-  await page.getByRole('textbox', { name: 'Custom website URL' }).fill('https://custom.example/');
-  await page.getByRole('button', { name: 'Open website', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Search or enter website URL' }).fill('https://custom.example/');
+  await page.getByRole('button', { name: 'Go', exact: true }).click();
   await expect(page.locator('[data-node-id="custom-title"]')).toBeVisible();
   expect(calls).toBe(1);
   await page.getByRole('button', { name: 'Refresh page', exact: true }).click();

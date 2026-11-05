@@ -9,8 +9,8 @@ test('website evidence uses soft peach and orange rather than yellow or blue', a
   } }));
   await page.route('**/api/ask', (r) => r.fulfill({ json: { kind: 'find', answer: 'Two sources [1] [2].', citations: [{ id: 'n1', marker: '1' }, { id: 'n2', marker: '2' }], visual: null } }));
   await page.goto('/');
-  await page.getByRole('textbox', { name: 'Custom website URL' }).fill('https://example.org/article');
-  await page.getByRole('button', { name: 'Open website', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Search or enter website URL' }).fill('https://example.org/article');
+  await page.getByRole('button', { name: 'Go', exact: true }).click();
   const frame = page.frameLocator('iframe');
   await expect(frame.locator('[data-pg-id="n1"]')).toBeVisible();
   await page.getByRole('textbox', { name: 'Message PageGuide' }).fill('/find show evidence');

@@ -324,7 +324,7 @@ export const useStore = create<StoreState>((set, get) => ({
     navigationAbort?.abort();
     navigationId++;
     agentAbort?.abort();
-    set({ browserView: 'empty', doc: null, selection: null, results: null, pageError: null, busy: false, guideRun: null, guide: null, evidence: [], focusedEvidence: null });
+    set({ browserView: 'empty', doc: null, selection: null, results: null, pageError: null, busy: false, guideRun: null, guide: null, evidence: [], focusedEvidence: null, navStack: [], navIndex: -1 });
   },
 
   resetSandbox: () => {
@@ -409,7 +409,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
   goBack: () => {
     const { navStack, navIndex } = get();
-    if (navIndex <= 0) return;
+    if (navIndex <= 0) return get().showLibrary();
     const i = navIndex - 1;
     set({ navIndex: i });
     void get().loadUrl(navStack[i], { push: false });

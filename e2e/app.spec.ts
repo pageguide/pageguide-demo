@@ -43,8 +43,8 @@ async function mockFind(page: Page) {
 }
 async function loadPage(page: Page) {
   await page.goto('/');
-  await page.getByRole('textbox', { name: 'Custom website URL' }).fill('https://trails.example/guide');
-  await page.getByRole('button', { name: 'Open website', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Search or enter website URL' }).fill('https://trails.example/guide');
+  await page.getByRole('button', { name: 'Go', exact: true }).click();
   await expect(page.getByText('Weekend Trails Guide').first()).toBeVisible();
 }
 
@@ -197,6 +197,6 @@ test('provider errors are surfaced, not silently swallowed', async ({ page }) =>
 test('Terminal view is disabled', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('button', { name: /Terminal/ })).toHaveCount(0);
-  await expect(page.getByRole('region', { name: 'Find saved websites' }).getByRole('button')).toHaveCount(6);
+  await expect(page.getByRole('region', { name: 'Find saved websites' }).getByRole('button')).toHaveCount(4);
   await expect(page.getByRole('region', { name: 'Guide interactive websites' }).getByRole('button')).toHaveCount(2);
 });
