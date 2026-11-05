@@ -145,7 +145,7 @@ export default function SidePanel() {
                 : ' This action can’t be undone.'}
             </p>
             <div className="mt-3 flex gap-2">
-              <button onClick={() => resolveConfirm(true)} className="flex-1 rounded-xl bg-orange px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange">{pendingConfirm.mode === 'step' ? 'Do this step' : 'Approve'}</button>
+              <button disabled={guideRun?.paused} onClick={() => resolveConfirm(true)} className="disabled:cursor-not-allowed disabled:opacity-50 flex-1 rounded-xl bg-orange px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange">{pendingConfirm.mode === 'step' ? 'Do this step' : 'Approve'}</button>
               <button onClick={() => resolveConfirm(false)} className="flex-1 rounded-xl border border-line px-4 py-2.5 text-sm font-semibold text-ink transition hover:bg-orange-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange dark:border-night-line dark:text-night-ink dark:hover:bg-white/5">{pendingConfirm.mode === 'step' ? 'Stop' : 'Deny'}</button>
             </div>
           </div>
@@ -307,8 +307,12 @@ function GuideCard({
       <div className="rounded-xl border border-line bg-white px-3 py-2.5 shadow-soft dark:border-night-line dark:bg-night-panel">
         <div className="flex items-start justify-between gap-2">
           <div className="text-base font-semibold text-ink dark:text-night-ink">{run.task}</div>
-
         </div>
+        {run.running && <div className="mt-3 flex flex-wrap items-center gap-2" role="group" aria-label="Guide task controls">
+          <button type="button" onClick={() => run.paused ? useStore.getState().resumeGuideRun() : useStore.getState().pauseGuideRun()} className="rounded-lg border border-orange-ring px-3 py-2 text-sm font-semibold text-orange hover:bg-orange-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange">{run.paused ? 'Resume' : 'Pause'}</button>
+          <button type="button" onClick={() => useStore.getState().cancelGuideRun()} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-muted hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange dark:border-night-line dark:text-night-muted">Cancel task</button>
+          {run.paused && <span role="status" className="text-xs text-muted dark:text-night-muted">Paused · no further actions until you resume</span>}
+        </div>}
         <button aria-label="View Journey" aria-expanded={journeyOpen} onClick={() => setJourneyOpen((o) => !o)} className="mt-2 flex min-h-10 items-center gap-1 text-sm font-medium text-muted dark:text-night-muted">
           <span className={`transition-transform ${journeyOpen ? 'rotate-90' : ''}`}>▸</span> View Journey
         </button>
@@ -326,7 +330,7 @@ function GuideCard({
             ))}
           </div>
         )}
-        {run.running && current && (
+        {run.running && !run.paused && current && (
           <div className="mt-2 flex items-center gap-2 border-t border-line pt-2 text-[11px] text-[#8c5a2b] dark:border-night-line dark:text-orange">
             <span className="pg-spinner" /> {current.instruction}
           </div>

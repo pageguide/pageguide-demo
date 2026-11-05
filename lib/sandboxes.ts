@@ -180,7 +180,9 @@ function soundcloudDoc(s: SandboxState): PageDoc {
 }
 
 function metMapDoc(s: SandboxState): PageDoc {
-  const rooms = ROOMS.filter(r => r.floor === s.mapFloor).map(r => [r.id, r.title, `Gallery ${r.gallery} · ${r.detail}`]);
+  // Search results across floors must be visible to both the agent and the UI.
+  const rooms = ROOMS.filter(r => r.floor === s.mapFloor || (!s.mapAmenity && s.query && `${r.title} ${r.gallery} ${r.detail}`.toLowerCase().includes(s.query.toLowerCase())))
+    .map(r => [r.id, r.title, `Gallery ${r.gallery} · Floor ${r.floor} · ${r.detail}`]);
   const blocks: Block[] = [
     paragraph('sandbox-label', 'The Met Museum map demo · fictional indoor navigation. No live location data.'),
     button('home', 'Museum map', 'navigation'), button('floor-1', 'Floor 1', 'navigation'), button('floor-2', 'Floor 2', 'navigation'), input('search', 'Search The Met', s.query, 'navigation'), button('search-submit', 'Search', 'navigation'),
@@ -246,7 +248,7 @@ export function applySandboxAction(s: SandboxState, action: BrowserAction, lib: 
     else if (n.site === 'met-map' && id === 'clear-map-search') { n.query = ''; n.mapAmenity = ''; n.mapPlace = ''; n.mapRouting = false; }
     else if (n.site === 'met-map' && id.startsWith('amenity-')) { n.view = 'map'; n.mapAmenity = s.mapAmenity === id.slice(8) ? '' : id.slice(8); n.query = AMENITIES.find(a => amenityKey(a) === n.mapAmenity) || ''; n.selected = ''; n.mapPlace = ''; n.mapRouting = false; }
     else if (n.site === 'met-map' && id.startsWith('place-')) { const place = MET_PLACES.find(p => p.id === id.slice(6))!; n.view = 'map'; n.mapPlace = place.id; n.selected = ''; n.mapRouting = false; if (place.floor === 1 || place.floor === 2) n.mapFloor = place.floor; n.mapZoom = Math.max(1.25, s.mapZoom || 1); }
-    else if (n.site === 'met-map' && id.startsWith('room-')) { n.selected = id.slice(5); n.mapPlace = ''; n.view = 'map'; n.mapRouting = false; n.notice = 'Gallery selected on the museum map.'; }
+    else if (n.site === 'met-map' && id.startsWith('room-')) { n.selected = id.slice(5); n.mapFloor = ROOMS.find(r => r.id === n.selected)!.floor as 1 | 2; n.mapPlace = ''; n.view = 'map'; n.mapRouting = false; n.notice = 'Gallery selected on the museum map.'; }
     else if (['cart', 'orders', 'wishlist', 'bookmarks'].includes(id)) n.view = id as SandboxState['view'];
     else if (id === 'settings') { n.view = 'settings'; n.draftLanguage = s.language; }
     else if (id === 'ask-question') n.view = 'ask';
@@ -341,7 +343,8 @@ export function verifySandboxTask(task: string, s: SandboxState, lib: Library, i
     }
   } else if (s.site === 'met-map') {
     // Accept any gallery that legitimately matches the task name (two galleries are "European Paintings").
-    const rooms = /temple/i.test(task) ? ['temple'] : /european paintings|impressionists/i.test(task) ? ['impressionists', 'european-old-masters'] : /modern/i.test(task) ? ['modern'] : [];
+    const rooms = /temple/i.test(task) ? ['temple'] : /european paintings|impressionists/i.test(task) ? ['impressionists', 'european-old-masters']
+      : ROOMS.filter(room => task.toLowerCase().includes(room.title.toLowerCase()) || new RegExp(`\\b${room.gallery}\\b`).test(task)).map(room => room.id);
     if (/\bfloor 2\b/i.test(task)) checks.push({ passed: s.mapFloor === 2, result: 'Floor 2 is open on the map.', missing: 'Floor 2 is not open.' });
     if (/\b(open|find|locate|show)\b/i.test(task) && rooms.length) checks.push({ passed: rooms.includes(s.selected), result: 'The requested gallery is selected on the museum map.', missing: 'The requested gallery is not selected on the map.' });
   }
