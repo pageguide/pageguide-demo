@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import ExampleMedia from './ExampleMedia';
 import { useStore } from '@/lib/store';
 import { articleUrl } from '@/lib/library';
@@ -32,7 +33,7 @@ export default function LibraryShelf() {
           <section aria-label="Find saved websites" className="xl:row-span-5 xl:grid xl:grid-rows-subgrid">
             <h2 className="text-lg font-semibold text-ink dark:text-night-ink">Find</h2>
             <p className="mt-1 text-base font-medium leading-snug text-ink dark:text-night-ink">The agent finds information and returns answer with evidence on the page.</p>
-            <ExampleMedia mode="Find" src="/examples/find-anchored-evidence.png" alt="Find example: a question about the stream emerging from Nevado Mismi, answered with numbered citations and highlighted source spans." width={2300} height={1324} />
+            <FindExample />
             <h3 className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-muted dark:text-night-muted">Or open a page to ask your own question</h3>
             <div className="grid auto-rows-fr gap-2 sm:grid-cols-2">
               {['roman-empire', 'blue-sky', 'web-accessibility', 'cold-war'].flatMap((id) => library.articles.filter((article) => article.id === id)).map((article) => (
@@ -53,7 +54,7 @@ export default function LibraryShelf() {
                 <div><dt className="inline font-semibold text-ink dark:text-night-ink">Manual</dt>{' · '}<dd className="inline">You approve each step</dd></div>
               </dl>
             </div>
-            <ExampleMedia mode="Guide" type="video" src="/demo-media/guide-latest.mp4?v=latest-256058da" gifSrc="/demo-media/guide-latest.gif?v=latest-256058da-15x" gifSeekSrc="/demo-media/guide-gif-seekable.mp4?v=latest-256058da-15x" gifPlaybackRate={1.5} poster="/examples/guide-demo-poster.jpg" captionsSrc="/examples/guide-demo.en.vtt" alt="Guide demonstration video" width={1440} height={1080} />
+            <ExampleMedia mode="Guide" query={'Find the nearest cafe to the American Wing\nOn the first floor of the MET Museum'} type="video" src="/demo-media/guide-latest.mp4?v=latest-256058da" gifSrc="/demo-media/guide-latest.gif?v=latest-256058da-15x" gifSeekSrc="/demo-media/guide-gif-seekable.mp4?v=latest-256058da-15x" gifPlaybackRate={1.5} poster="/examples/guide-demo-poster.jpg" captionsSrc="/examples/guide-demo.en.vtt" alt="Guide demonstration video" width={1440} height={1080} />
             <h3 className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-muted dark:text-night-muted">Or open a demo website to try your own task</h3>
             <div className="grid auto-rows-fr gap-2 sm:grid-cols-2">
               {GUIDE_SITES.map((site) => (
@@ -69,4 +70,33 @@ export default function LibraryShelf() {
       </div>
     </div>
   );
+}
+
+function FindExample() {
+  const [activeCitation, setActiveCitation] = useState<number | null>(null);
+  const highlight = (citations: number[]) => `font-semibold text-[#23549b] ${citations.includes(activeCitation ?? -1) ? 'bg-[#ffe29d] outline outline-2 outline-orange' : 'bg-[#cfe0fb]'}`;
+
+  return (
+    <figure className="mt-3 flex min-w-0 self-stretch flex-col gap-3 rounded-xl border border-orange-ring bg-orange-soft p-3 dark:border-night-line dark:bg-night-panel">
+      <figcaption className="sr-only">Find example</figcaption>
+      <p className="rounded-lg bg-white/80 px-3 py-2 text-sm leading-relaxed text-ink dark:bg-white/5 dark:text-night-ink">
+        <span className="font-semibold text-orange">Query:</span>{' '}Which stream emerges from Nevado Mismi before eventually contributing to the Apurimac River system?
+      </p>
+      <div className="grid min-w-0 grid-cols-2 gap-3">
+        <div className="flex min-w-0 items-center">
+          <p className="min-w-0 text-left text-[clamp(.75rem,1.35vw,1.1rem)] leading-snug text-ink dark:text-night-ink">
+            <mark className={highlight([1])}>Nevado Mismi</mark> peak, located roughly 160 km (99 mi) west of Lake Titicaca. From that point, <mark className={highlight([2, 3])}>Quebrada Carhuasanta</mark> emerges from Nevado Mismi, ...becomes <mark className={highlight([4, 5])}>Río Hornillos</mark> and eventually joins the <mark className={highlight([6])}>Río Apurímac</mark>.
+          </p>
+        </div>
+        <div className="min-w-0 rounded-lg bg-[#1f2636] text-[clamp(.75rem,1.25vw,1.05rem)] leading-snug text-[#e7eaf0]">
+          <div className="border-b border-white/80 px-3 py-2 font-semibold text-orange">🍊 PageGuide</div>
+          <p className="p-3">The stream that emerges from <strong className="text-[#9fc5ff]">Nevado Mismi</strong> <Citation number={1} active={activeCitation === 1} onClick={setActiveCitation} /> is <strong className="text-[#9fc5ff]">Quebrada Carhuasanta</strong> <Citation number={2} active={activeCitation === 2} onClick={setActiveCitation} />. It joins <strong className="text-[#9fc5ff]">Quebrada Apacheta</strong> <Citation number={3} active={activeCitation === 3} onClick={setActiveCitation} /> to form the <strong className="text-[#9fc5ff]">Río Lloqueta</strong> <Citation number={4} active={activeCitation === 4} onClick={setActiveCitation} />, which then becomes the <strong className="text-[#9fc5ff]">Río Hornillos</strong> <Citation number={5} active={activeCitation === 5} onClick={setActiveCitation} /> before eventually joining the <strong className="text-[#9fc5ff]">Río Apurímac</strong> <Citation number={6} active={activeCitation === 6} onClick={setActiveCitation} />.</p>
+        </div>
+      </div>
+    </figure>
+  );
+}
+
+function Citation({ number, active, onClick }: { number: number; active: boolean; onClick: (number: number) => void }) {
+  return <button type="button" aria-pressed={active} aria-label={`Highlight source for citation ${number}`} onClick={() => onClick(number)} className={`rounded px-0.5 font-bold text-[#f2b383] transition-colors hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange ${active ? 'bg-white/20' : ''}`}>[{number}]</button>;
 }
