@@ -319,7 +319,7 @@ function GuideCard({
                 {j.screenshot ? (
                   <EvidenceBadge ev={stepEvidence(i)} ariaLabel={`View step ${i}: ${j.instruction}`} onOpen={() => setOpenStep(i)}>
                     <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${dot(j.status)}`} />
-                    <span><span className="text-xs text-muted dark:text-night-muted">{i === 0 ? 'Initial state' : `Step ${i}`} · </span>{j.instruction}<span aria-hidden="true" className="ml-1 text-orange">▧</span></span>
+                    <span><span className="text-xs text-muted dark:text-night-muted">{i === 0 ? 'Initial state' : `Step ${i}`} · </span>{j.instruction}</span>
                   </EvidenceBadge>
                 ) : <div className="flex items-start gap-2"><span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${dot(j.status)}`} /><span>{j.instruction}{j.screenshotError && <span className="block text-xs text-muted">{j.screenshotError}</span>}</span></div>}
               </div>
@@ -609,7 +609,7 @@ function Message({
         </div>
       )}
       <p className={`whitespace-pre-wrap ${m.error ? 'rounded-lg bg-[#fff2e9] px-3 py-2 dark:bg-[#3a2a22]' : ''}`}>
-        {isFind ? renderAnswer(m.text, citations, visual) : m.text}
+        {isFind ? renderAnswer(m.text, citations, visual, isFind ? m.result.sourceUrl : undefined) : m.text}
       </p>
       {visual && <VisualEvidence v={visual} />}
     </div>
@@ -619,8 +619,9 @@ function Message({
 // Render the answer text, turning [1], [2], [V1] tokens into clickable citation chips.
 function renderAnswer(
   text: string,
-  citations: { marker: string; id: string; quote?: string }[],
+  citations: { marker: string; id: string; quote?: string; emphasis?: string }[],
   visual: { marker: string; id: string } | null,
+  sourceUrl?: string,
 ) {
   const parts: ReactNode[] = [];
   const re = /\[([A-Za-z]{0,2}\d+)\]/g;
@@ -635,7 +636,7 @@ function renderAnswer(
       parts.push(
         <button
           key={`c${k++}`}
-          onClick={() => useStore.getState().focusEvidence(cite.id)}
+          onClick={() => useStore.getState().focusEvidence(cite.id, cite, sourceUrl)}
           title={cite.quote ? `“${cite.quote}”` : 'Show source on the page'}
           className="align-super text-[9px] font-semibold text-[#6366f1] hover:underline dark:text-[#a5a1f5]"
         >
@@ -646,7 +647,7 @@ function renderAnswer(
       parts.push(
         <button
           key={`v${k++}`}
-          onClick={() => useStore.getState().focusEvidence(visual.id)}
+          onClick={() => useStore.getState().focusEvidence(visual.id, { id: visual.id, marker: visual.marker }, sourceUrl)}
           title="Show the image on the page"
           className="align-super text-[9px] font-semibold text-[#b7791f] hover:underline"
         >

@@ -130,7 +130,7 @@ interface StoreState {
   guideNext: () => void;
   setFieldValue: (id: string, v: string) => void;
   setSelection: (selection: PageSelection | null) => void;
-  focusEvidence: (id: string) => void;
+  focusEvidence: (id: string, citation?: { id: string; quote?: string; emphasis?: string; marker?: string }, sourceUrl?: string) => void;
   toggleJourney: () => void;
   toggleReasoning: () => void;
   closeGuideRun: () => void;
@@ -542,6 +542,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const result = data as AskResult;
 
       if (result.kind === 'find') {
+        result.sourceUrl = doc.url;
         // Highlight ALL cited passages (persist); focus/scroll to the first.
         const evidence = [
           ...result.citations.map((c) => ({ id: c.id, quote: c.quote, emphasis: c.emphasis, marker: c.marker })),
@@ -677,7 +678,18 @@ export const useStore = create<StoreState>((set, get) => ({
 
   toggleHistory: (open) => set({ historyOpen: open ?? !get().historyOpen }),
 
-  focusEvidence: (id) => set({ focusedEvidence: id }),
+  focusEvidence: async (id, citation, sourceUrl) => {
+    if (sourceUrl && get().doc?.url !== sourceUrl) {
+      await get().loadUrl(sourceUrl);
+      if (get().doc?.url !== sourceUrl || get().browserView !== 'page') return;
+    }
+    // A fresh evidence array makes every click a scroll request, even on the same ID.
+    // Restore the clicked answer's quote instead of reusing a later answer's highlight.
+    const evidence = citation
+      ? [...get().evidence.filter((entry) => entry.id !== id), citation]
+      : [...get().evidence];
+    set({ evidence, focusedEvidence: id });
+  },
 
   toggleJourney: () => {
     const r = get().guideRun;

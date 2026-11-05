@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { PROVIDERS, resolveKey } from '@/lib/providers';
 import type { AskRequestBody, Block, Provider } from '@/lib/types';
 import { composeFindAnswer } from '@/lib/find-answer';
+import { selectFindPassages, validCitationQuote } from '@/lib/find-passages';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -42,6 +43,7 @@ Write concise, separately supported claims. Citations must appear throughout the
 - Do not add a separate sources/citations footer. The server assembles each claim and its markers inline in the order you provide.
 - Every citation "id" MUST be a text block id (heading/paragraph/listitem/quote) from the page.
 - "quote" MUST be an exact, verbatim substring of that block's text: the supporting passage, a complete sentence or clause that gives enough context (it may be on the longer side). Copy it character-for-character.
+- Each claim must be fully supported by its quoted passage. Do not add a more precise date, number, or detail than the passage provides. If it gives only a month and year, do not invent the day.
 - "emphasis" is OPTIONAL: when one specific phrase inside "quote" most directly supports the point, set "emphasis" to that exact phrase — a verbatim substring of "quote" — and it will be highlighted more strongly within the quote. Omit it when the whole quote is the point.
 - Use "visual" ONLY when one of the provided IMAGE blocks supports the answer: "id" is that image's block id and "box" is the region of THAT image supporting the answer as normalized [x, y, width, height], each 0..1 from the image's top-left corner. Otherwise set "visual" to null.
 - If the user's message is a greeting, small talk, or NOT a question about this page (e.g. "hi", "hello", "thanks"), do NOT answer from the page: return one short claim inviting them to ask about the page, with "markers": [], "citations": [], and "visual": null. Never fabricate an answer or a citation.
@@ -83,7 +85,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const blocks: Block[] = doc.blocks.slice(0, MAX_BLOCKS);
+  const blocks: Block[] = mode === 'find'
+    ? selectFindPassages(doc.blocks, question, body.selection?.url === doc.url ? body.selection.id : undefined, MAX_BLOCKS)
+    : doc.blocks.slice(0, MAX_BLOCKS);
   const controlIds = new Set(blocks.filter((b) => b.control).map((b) => b.id));
   const compact = blocks.map((b) => ({
     id: b.id,
@@ -223,7 +227,7 @@ export async function POST(req: NextRequest) {
       const textById = new Map(blocks.map((b) => [b.id, b.text]));
       const norm = (s: string) => s.replace(/\s+/g, ' ').trim().toLowerCase();
       const citations = (Array.isArray(parsed?.citations) ? parsed.citations : [])
-        .filter((c: any) => c && typeof c.id === 'string' && textAllow.has(c.id))
+        .filter((c: any) => c && typeof c.id === 'string' && textAllow.has(c.id) && validCitationQuote(textById.get(c.id) || '', c.quote))
         .slice(0, 8)
         .map((c: any) => {
           // keep the quote only if it's genuinely a substring of the block text
@@ -275,13 +279,17 @@ export async function POST(req: NextRequest) {
         if (c.marker && !markerMap.has(c.marker)) markerMap.set(c.marker, next);
         return { ...c, marker: next };
       });
-      const remap = (m: string) => markerMap.get(m) ?? m; // leaves visual markers (V1) untouched
+      const remap = (m: string) => markerMap.get(m) ?? (visual?.marker === m ? m : '__invalid_citation__');
       const claims = Array.isArray(parsed?.claims)
         ? parsed.claims.map((cl: any) => ({ ...cl, markers: Array.isArray(cl?.markers) ? cl.markers.map((m: any) => remap(String(m))) : cl?.markers }))
         : parsed?.claims;
 
       const allowed = new Set<string>([...renumbered.map((c: { marker: string }) => c.marker), ...(visual ? [visual.marker] : [])]);
-      const inlineAnswer = composeFindAnswer(claims, answer, allowed);
+      const fallbackMarkers = [...answer.matchAll(/\[([A-Za-z]{0,2}\d+)\]/g)];
+      const fallback = fallbackMarkers.some((match) => remap(match[1]) === '__invalid_citation__')
+        ? 'I couldn’t verify an answer in the provided page passages.'
+        : answer.replace(/\[([A-Za-z]{0,2}\d+)\]/g, (_: string, marker: string) => `[${remap(marker)}]`);
+      const inlineAnswer = composeFindAnswer(claims, fallback, allowed);
       if (!inlineAnswer) return NextResponse.json({ error: 'The model returned no answer.' }, { status: 502 });
       // Only keep evidence whose marker actually appears in the answer, so every on-page
       // highlight maps to a visible [n] in the answer (and vice versa) — no orphaned highlights.

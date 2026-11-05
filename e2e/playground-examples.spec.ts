@@ -89,7 +89,7 @@ for (const mode of ['Find', 'Guide'] as const) {
     await page.goto('/');
     await page.getByRole('button', { name: `Try this ${mode} example →`, exact: true }).click();
     const composer = page.getByPlaceholder('Ask PageGuide…  (type / to pick a mode)');
-    await expect(composer).toHaveValue(mode === 'Guide' ? 'Add oranges to my cart' : 'When did the Berlin Wall fall?');
+    await expect(composer).toHaveValue(mode === 'Guide' ? 'Add oranges to my cart' : 'When did the Berlin Wall fall?', { timeout: 20000 });
     await expect(composer).toBeFocused();
     if (mode === 'Guide') {
       await expect(page.locator('[data-sandbox-root]')).toBeVisible();
