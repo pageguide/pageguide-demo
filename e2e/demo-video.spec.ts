@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 
 test('deployment copies contain real binary media rather than Git LFS pointers', () => {
-  for (const file of ['guide-latest.mp4', 'guide-latest.webm', 'guide-latest.gif']) {
+  for (const file of ['guide-latest.mp4', 'guide-latest.webm', 'guide-latest.gif', 'guide-gif-seekable.mp4', 'guide-gif-seekable.webm']) {
     const data = readFileSync(`public/demo-media/${file}`);
     expect(data.length).toBeGreaterThan(100000);
     expect(data.subarray(0, 128).toString()).not.toContain('version https://git-lfs');
@@ -33,6 +33,6 @@ test('demo video supports metadata, byte ranges, and invalid range responses', a
   expect(gif.headers()['content-type']).toBe('image/gif');
   const header = await gif.body();
   expect(header.subarray(0, 3).toString()).toBe('GIF');
-  expect(header.readUInt16LE(6)).toBe(1920);
+  expect(header.readUInt16LE(6)).toBe(1440);
   expect(header.readUInt16LE(8)).toBe(1080);
 });

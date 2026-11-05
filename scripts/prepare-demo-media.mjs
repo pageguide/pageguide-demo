@@ -6,6 +6,8 @@ const copies = [
   ['latest.gif', 'guide-latest.gif'],
   ['guide-demo-browser.mp4', 'guide-latest.mp4'],
   ['guide-demo-browser.webm', 'guide-latest.webm'],
+  ['guide-gif-seekable.mp4', 'guide-gif-seekable.mp4'],
+  ['guide-gif-seekable.webm', 'guide-gif-seekable.webm'],
 ];
 for (const [source] of copies) {
   const data = await readFile(new URL(`../demo-video/${source}`, import.meta.url));
