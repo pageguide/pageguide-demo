@@ -5,7 +5,7 @@ test('Floor 2 matches the reference departments and each service has its own sel
   test.setTimeout(90000);
   await page.route('**/api/library', r => r.fulfill({ json: { library } }));
   await page.goto('/');
-  await page.getByRole('button', { name: /The Met Map sandbox/ }).click();
+  await page.getByRole('button', { name: /The Met Map .*Open/ }).click();
   const site = page.locator('[data-sandbox-root]');
   await site.getByLabel('Museum floor').selectOption('2');
   await expect(site.getByRole('button', { name: 'Open Musical Instruments', exact: true })).toBeVisible();

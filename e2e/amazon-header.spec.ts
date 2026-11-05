@@ -12,7 +12,7 @@ test('annotation coordinates account for scrolling and clip to the capture, not 
 test('Amazon uses scalable logo/cart artwork and keeps cart counts aligned on narrow and wide screens', async ({ page }) => {
   await page.route('**/api/library', r => r.fulfill({ json: { library } }));
   await page.goto('/');
-  await page.getByRole('button', { name: /Amazon sandbox/ }).click();
+  await page.getByRole('button', { name: /Amazon .*Open/ }).click();
   const site = page.locator('[data-sandbox-root]');
   const logo = site.getByRole('button', { name: 'Amazon home', exact: true });
   await expect(logo.locator('img')).toHaveJSProperty('complete', true);
@@ -55,7 +55,7 @@ test('saved annotations align with a scrolled Amazon page and stay inside the ev
     : { instruction: 'Confirm the saved coffee', action: { type: 'finish' }, evidence: { name: 'coffee-saved', description: 'Coffee saved in the wishlist', targetId: 'wishlist', annotate: 'Coffee saved! This annotation should stay within the screenshot.' } } }));
   await page.route('**/api/summarize', r => { const body = r.request().postDataJSON(); return r.fulfill({ json: { answer: `Coffee saved. [EV:${body.evidence[0].name}]` } }); });
   await page.goto('/');
-  await page.getByRole('button', { name: /Amazon sandbox/ }).click();
+  await page.getByRole('button', { name: /Amazon .*Open/ }).click();
   const site = page.locator('[data-sandbox-root]');
   await site.evaluate(root => { root.scrollTop = 250; });
   await page.getByRole('button', { name: 'Guide: Save coffee to my wishlist', exact: true }).click();

@@ -14,7 +14,7 @@ test('saving each language translates the entire Quora UI and built-in discussio
   test.setTimeout(90000);
   await page.route('**/api/library', r => r.fulfill({ json: { library } }));
   await page.goto('/');
-  await page.getByRole('button', { name: /Quora sandbox/ }).click();
+  await page.getByRole('button', { name: /Quora .*Open/ }).click();
   const site = page.locator('[data-sandbox-root]');
   for (const locale of locales) {
     await site.locator('[data-node-id="settings"]').click();
@@ -38,7 +38,7 @@ test('saving each language translates the entire Quora UI and built-in discussio
     if (locale.name === 'Spanish') await page.screenshot({ path: '/tmp/quora-spanish.png' });
     if (locale.name === 'French') {
       await page.reload();
-      await page.getByRole('button', { name: /Quora sandbox/ }).click();
+      await page.getByRole('button', { name: /Quora .*Open/ }).click();
       await expect(site).toHaveAttribute('lang', 'fr');
     }
   }
