@@ -91,6 +91,7 @@ export interface AskDebug {
 
 export interface FindResult {
   kind: 'find';
+  sourceUrl?: string; // page this answer's citations belong to
   answer: string;
   citations: TextCitation[];
   visual: VisualEvidence | null;

@@ -1,7 +1,7 @@
 import * as cheerio from 'cheerio';
 import type { Block, BlockType, PageDoc } from './types';
 
-const clean = (text: string | undefined | null) => (text || '').replace(/\s+/g, ' ').trim().slice(0, 800);
+const clean = (text: string | undefined | null) => (text || '').replace(/\s+/g, ' ').trim().slice(0, 4000);
 
 /** Keep original HTML/CSS; tag source elements for grounding. Never reconstruct the website. */
 export function extractPage(html: string, base: URL): PageDoc {
@@ -28,7 +28,7 @@ export function extractPage(html: string, base: URL): PageDoc {
   const seen = new Set<string>();
   let images = 0;
   const push = (type: BlockType, text: string, extra: Partial<Block> = {}) => {
-    if (blocks.length >= 220) return;
+    if (blocks.length >= 5000) return;
     const value = clean(text);
     const key = `${type}|${extra.src || value}`;
     if (!value || seen.has(key)) return;
@@ -38,7 +38,7 @@ export function extractPage(html: string, base: URL): PageDoc {
     return id;
   };
   $(rootEl).find('h1,h2,h3,h4,h5,h6,p,li,blockquote,a[href],button,[role="button"],input,textarea,select,img').each((_, el) => {
-    if (blocks.length >= 220) return false;
+    if (blocks.length >= 5000) return false;
     const node = $(el);
     if (node.closest(CHROME).length) return;
     const tag = (el as { tagName?: string }).tagName?.toLowerCase() || '';

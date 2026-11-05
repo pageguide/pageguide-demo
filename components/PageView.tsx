@@ -307,7 +307,7 @@ function ReaderFallback({
     const t = focusedEvidence || guideId;
     if (!t || !ref.current) return;
     ref.current.querySelector(`[data-node-id="${t}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, [focusedEvidence, guideId]);
+  }, [evidence, focusedEvidence, guideId]);
   return (
     <div ref={ref} onMouseUp={() => { const selected = ref.current && readPageSelection(ref.current, doc.url); if (selected) onSelection?.(selected); }}
       onKeyUp={() => { const selected = ref.current && readPageSelection(ref.current, doc.url); if (selected) onSelection?.(selected); }}
