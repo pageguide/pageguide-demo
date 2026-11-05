@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore, type GuideRun } from '@/lib/store';
-import type { Evidence, PageSelection } from '@/lib/types';
+import type { AskDebug, Evidence, PageSelection, Usage } from '@/lib/types';
 import { evidenceForAnswer } from '@/lib/evidence';
 
 const MODES = [
@@ -53,7 +53,16 @@ export default function SidePanel() {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [messages, guideRun, pendingConfirm]);
 
-  const usages = messages.flatMap((m) => m.result?.usage ? [m.result.usage] : []);
+  const guideRuns = [...messages.flatMap((m) => m.guide ? [m.guide.run] : []), ...(guideRun ? [guideRun] : [])];
+  const usages: Usage[] = [
+    ...messages.flatMap((m) => m.result?.usage ? [m.result.usage] : []),
+    ...guideRuns.flatMap((run) => run.admin?.usages || []),
+  ];
+  const diagnostics: AskDebug[] = [
+    ...messages.flatMap((m) => m.result?.debug ? [m.result.debug] : []),
+    ...guideRuns.flatMap((run) => run.admin?.requests || []),
+  ];
+  const latestDiagnostic = diagnostics[diagnostics.length - 1];
   const tokens = usages.reduce((sum, usage) => sum + usage.total, 0);
   const cost = usages.reduce((sum, usage) => sum + (usage.cost ?? 0), 0);
   const costUnknown = usages.some((usage) => usage.cost === null);
@@ -236,15 +245,38 @@ export default function SidePanel() {
         </div>
         {adminNotice && <p role="status" className="mt-2 text-center text-sm text-muted dark:text-night-muted">{adminNotice}</p>}
         {admin && (
-          <p data-testid="admin-usage" className="mt-2 text-center text-xs tabular-nums text-muted dark:text-night-muted">
-            {tokens.toLocaleString()} tokens · {estimated ? '≈ ' : ''}${cost.toFixed(5)}{costUnknown ? ' + unpriced usage' : ''}
-            <span className="block">Recorded usage · Guide usage not available</span>
-          </p>
+          <div className="mt-2 text-center text-xs tabular-nums text-muted dark:text-night-muted">
+            <p data-testid="admin-usage">
+              {tokens.toLocaleString()} tokens · {estimated ? '≈ ' : ''}${cost.toFixed(5)}{costUnknown ? ' + unpriced usage' : ''}
+              <span className="block">Recorded model usage</span>
+            </p>
+            <AdminInspector debug={latestDiagnostic} />
+          </div>
         )}
         <p className="mt-2 text-center text-xs text-muted dark:text-night-muted">PageGuide can make mistakes. Check important details.</p>
       </div>
     </section>
   );
+}
+
+function AdminInspector({ debug }: { debug: AskDebug | undefined }) {
+  if (!debug) return <p data-testid="admin-inspector-empty" className="mt-2">No model request has been recorded yet.</p>;
+  return (
+    <details data-testid="admin-inspector" className="mt-2 rounded-lg border border-line bg-white/60 p-2 text-left dark:border-night-line dark:bg-white/5">
+      <summary className="cursor-pointer text-center font-semibold text-ink dark:text-night-ink">Latest model request</summary>
+      <p className="mt-2 text-center">{debug.provider} · {debug.model}</p>
+      <PromptBlock label="System prompt" value={debug.system} />
+      <PromptBlock label="Input prompt" value={debug.input} />
+      <PromptBlock label="Raw response" value={debug.rawOutput} />
+    </details>
+  );
+}
+
+function PromptBlock({ label, value }: { label: string; value: string }) {
+  return <details className="mt-2 rounded border border-line/70 p-1.5 dark:border-night-line">
+    <summary className="cursor-pointer font-medium text-ink dark:text-night-ink">{label}</summary>
+    <pre className="pg-scroll mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words text-[10px] leading-relaxed text-muted dark:text-night-muted">{value}</pre>
+  </details>;
 }
 
 function GuideCard({

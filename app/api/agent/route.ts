@@ -6,6 +6,16 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const MAX_BLOCKS = 160;
+const PRICES: Record<string, [number, number]> = {
+  'gpt-4o-mini': [0.15, 0.6], 'gpt-4o': [2.5, 10], 'gpt-4.1-mini': [0.4, 1.6], 'gpt-4.1': [2, 8], 'gpt-4.1-nano': [0.1, 0.4],
+};
+
+function estimateCost(model: string, prompt: number, completion: number): number | null {
+  const key = Object.keys(PRICES).find((name) => model.includes(name));
+  if (!key) return null;
+  const [input, output] = PRICES[key];
+  return (prompt * input + completion * output) / 1_000_000;
+}
 
 const SYSTEM = `You are an autonomous web agent completing a task across web pages. Each turn you OBSERVE the current page (a list of blocks with ids) and your history, then emit ONE next action for the browser to perform. You may also navigate to other pages.
 
@@ -109,6 +119,7 @@ export async function POST(req: NextRequest) {
         temperature: 0,
         max_tokens: 500,
         response_format: { type: 'json_object' },
+        ...(provider === 'openrouter' ? { usage: { include: true } } : {}),
         messages: [{ role: 'system', content: SYSTEM }, userMessage],
       }),
     });
@@ -120,11 +131,19 @@ export async function POST(req: NextRequest) {
       );
     }
     const data = await res.json();
+    const rawOutput: string = data?.choices?.[0]?.message?.content ?? '';
+    const rawUsage = data?.usage || {};
+    const prompt = Number(rawUsage.prompt_tokens) || 0;
+    const completion = Number(rawUsage.completion_tokens) || 0;
+    const total = Number(rawUsage.total_tokens) || prompt + completion;
+    const cost = provider === 'openrouter' && typeof rawUsage.cost === 'number' ? rawUsage.cost : estimateCost(model, prompt, completion);
+    const usage = { prompt, completion, total, cost, estimated: provider !== 'openrouter' };
+    const debug = { provider, model, system: SYSTEM, input: userJson, images: imageBlocks.map((block) => block.src as string), rawOutput };
     let parsed: any;
     try {
-      parsed = JSON.parse(data?.choices?.[0]?.message?.content ?? '{}');
+      parsed = JSON.parse(rawOutput || '{}');
     } catch {
-      const mm = (data?.choices?.[0]?.message?.content ?? '').match(/\{[\s\S]*\}/);
+      const mm = rawOutput.match(/\{[\s\S]*\}/);
       parsed = mm ? JSON.parse(mm[0]) : {};
     }
 
@@ -159,6 +178,8 @@ export async function POST(req: NextRequest) {
       instruction: typeof parsed?.instruction === 'string' ? parsed.instruction.slice(0, 300) : action.type,
       action,
       ...(evidence ? { evidence } : {}),
+      usage,
+      debug,
     });
   } catch (err: unknown) {
     const aborted = err instanceof Error && err.name === 'AbortError';

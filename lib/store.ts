@@ -11,6 +11,7 @@ import { pageWithSelection } from './page-selection';
 import { readQuoraLanguage, saveQuoraLanguage } from './quora-i18n';
 import type {
   AskResult,
+  AskDebug,
   AutoMode,
   Evidence,
   EvidenceRequest,
@@ -19,6 +20,7 @@ import type {
   PageDoc,
   PageSelection,
   Provider,
+  Usage,
   SavedChat,
   SearchResult,
 } from './types';
@@ -32,6 +34,7 @@ export interface GuideRun {
   reasoningOpen: boolean;
   running: boolean;
   final: { status: string; answer: string; reasoning: string; verification?: VerificationResult } | null;
+  admin: { requests: AskDebug[]; usages: Usage[] };
 }
 
 export type Surface = 'browser' | 'terminal';
@@ -501,6 +504,7 @@ export const useStore = create<StoreState>((set, get) => ({
           reasoningOpen: false,
           running: true,
           final: null,
+          admin: { requests: [], usages: [] },
         },
       });
       try {
@@ -835,7 +839,17 @@ async function runAgent(
       const data = await res.json();
       if (!alive()) return;
       if (!res.ok) throw new Error(data?.error || 'The agent failed.');
-      const { instruction, action, evidence } = data as { instruction: string; action: BrowserAction; evidence?: EvidenceRequest };
+      const { instruction, action, evidence, usage, debug } = data as { instruction: string; action: BrowserAction; evidence?: EvidenceRequest; usage?: Usage; debug?: AskDebug };
+      const activeRun = get().guideRun;
+      if (activeRun && (usage || debug)) {
+        set({ guideRun: {
+          ...activeRun,
+          admin: {
+            requests: debug ? [...activeRun.admin.requests, debug] : activeRun.admin.requests,
+            usages: usage ? [...activeRun.admin.usages, usage] : activeRun.admin.usages,
+          },
+        } });
+      }
       if (!action || !['navigate', 'click', 'fill', 'finish'].includes(action.type)) throw new Error('The agent returned an invalid action.');
       // Manual mode: pause on every executable step. Auto mode: pause only for irreversible actions.
       const risk = site ? actionRisk(action) : null;

@@ -37,6 +37,7 @@ async function mockFind(page: Page) {
         citations: [{ marker: '1', id: 'n1' }],
         visual: null,
         usage: { prompt: 100, completion: 50, total: 150, cost: 0.00012, estimated: true },
+        debug: { provider: 'openai', model: 'gpt-4o-mini', system: 'Use page evidence only.', input: '{"question":"When is the best time to visit?"}', images: [], rawOutput: '{"claims":[]}' },
       },
     }),
   );
@@ -139,7 +140,7 @@ test('clear chat removes conversation and highlights but keeps the page', async 
   await expect(page.locator('[data-node-id="n0"]')).toBeVisible();
 });
 
-test('usage is admin-only and no model labels or extra toolbar buttons appear', async ({ page }) => {
+test('usage and model diagnostics are admin-only', async ({ page }) => {
   await mockFetch(page);
   await mockFind(page);
   await loadPage(page);
@@ -147,17 +148,42 @@ test('usage is admin-only and no model labels or extra toolbar buttons appear', 
   await page.keyboard.press('Enter');
   await expect(page.getByText(/Visit in late spring/).first()).toBeVisible();
   await expect(page.getByTestId('admin-usage')).toHaveCount(0);
+  await expect(page.getByTestId('admin-inspector')).toHaveCount(0);
   // The local admin command never becomes a chat message or provider request.
   await page.fill('textarea', '/admin admin2026pageguide');
   await page.getByRole('button', { name: 'Send', exact: true }).click();
   await expect(page.getByTestId('admin-usage')).toContainText('150 tokens · ≈ $0.00012');
+  await page.getByTestId('admin-inspector').getByText('Latest model request', { exact: true }).click();
+  await expect(page.getByTestId('admin-inspector')).toContainText('gpt-4o-mini');
+  await page.getByTestId('admin-inspector').getByText('System prompt', { exact: true }).click();
+  await expect(page.getByTestId('admin-inspector')).toContainText('Use page evidence only.');
   const panel = page.getByRole('region', { name: 'PageGuide chat' });
   await expect(panel).not.toContainText('admin2026pageguide');
-  await expect(panel).not.toContainText(/OpenAI|OpenRouter|gpt-/);
   await expect(panel.locator('header button')).toHaveCount(2);
   await page.fill('textarea', '/admin off');
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('admin-usage')).toHaveCount(0);
+  await expect(page.getByTestId('admin-inspector')).toHaveCount(0);
+});
+
+test('admin mode exposes Guide request diagnostics and usage', async ({ page }) => {
+  await page.route('**/api/agent', (r) => r.fulfill({ json: {
+    instruction: 'Finish the task.', action: { type: 'finish' },
+    usage: { prompt: 200, completion: 40, total: 240, cost: 0.0002, estimated: true },
+    debug: { provider: 'openai', model: 'gpt-4o-mini', system: 'Complete the task safely.', input: '{"task":"Add oranges"}', images: [], rawOutput: '{"action":{"type":"finish"}}' },
+  } }));
+  await page.goto('/');
+  await page.getByRole('button', { name: /Amazon sandbox/ }).click();
+  await page.getByRole('button', { name: 'Auto', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Message PageGuide' }).fill('Add oranges to my cart');
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
+  await expect(page.getByTestId('guide-status')).toBeVisible();
+  await page.getByRole('textbox', { name: 'Message PageGuide' }).fill('/admin admin2026pageguide');
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
+  await expect(page.getByTestId('admin-usage')).toContainText('240 tokens · ≈ $0.00020');
+  await page.getByTestId('admin-inspector').getByText('Latest model request', { exact: true }).click();
+  await page.getByTestId('admin-inspector').getByText('Input prompt', { exact: true }).click();
+  await expect(page.getByTestId('admin-inspector')).toContainText('{"task":"Add oranges"}');
 });
 
 test('narrow screens keep the composer visible without horizontal overflow', async ({ page }) => {
