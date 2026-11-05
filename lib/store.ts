@@ -34,6 +34,7 @@ export interface GuideRun {
   reasoningOpen: boolean;
   running: boolean;
   paused?: boolean;
+  activity?: string;
   final: { status: string; answer: string; reasoning: string; verification?: VerificationResult } | null;
   admin: { requests: AskDebug[]; usages: Usage[] };
 }
@@ -809,6 +810,7 @@ function setJourney(
 }
 
 const MAX_AGENT_STEPS = 16;
+const MAX_AGENT_CORRECTIONS = 2; // Model mistakes the agent may recover from before the run stops.
 
 // Autonomous Guide agent loop: observe the current page, ask the agent for ONE action
 // (which may navigate to another page), perform it, save evidence, repeat — then summarize.
@@ -842,6 +844,8 @@ function describeStep(action: BrowserAction): string {
   return 'Click the highlighted control on the page.';
 }
 
+const actionKey = (action: BrowserAction) => [action.type, action.id || action.url, action.value].filter(Boolean).join(' ');
+
 async function runAgent(
   get: () => StoreState,
   set: (p: Partial<StoreState>) => void,
@@ -864,12 +868,14 @@ async function runAgent(
   let finished = false;
   let failure = '';
   let stopReason = '';
+  let corrections = 0;
   await captureStep(get, set, 0, undefined, alive, selection);
   try {
     for (let t = 0; t < MAX_AGENT_STEPS; t++) {
       if (!await ready()) return;
       const doc = get().doc;
       if (!doc) throw new Error('The page is no longer available.');
+      set({ guideRun: { ...get().guideRun!, activity: 'Planning the next action…' } });
       const res = await fetch('/api/agent', {
         method: 'POST', signal,
         headers: { 'Content-Type': 'application/json', 'x-provider-key': currentKey(settings) },
@@ -877,8 +883,14 @@ async function runAgent(
       });
       const data = await res.json();
       if (!await ready()) return;
+      // An invalid or truncated model reply is a model mistake, not a run failure: tell it what went wrong and retry.
+      if (!res.ok && data?.retryable && corrections < MAX_AGENT_CORRECTIONS) {
+        corrections++;
+        history.push({ instruction: 'Runtime rejected the last proposed action.', action: 'invalid', observation: String(data.error).slice(0, 300) });
+        continue;
+      }
       if (!res.ok) throw new Error(data?.error || 'The agent failed.');
-      const { instruction, action, evidence, usage, debug } = data as { instruction: string; action: BrowserAction; evidence?: EvidenceRequest; usage?: Usage; debug?: AskDebug };
+      const { instruction: proposedInstruction, action: proposed, evidence, usage, debug } = data as { instruction: string; action: BrowserAction; evidence?: EvidenceRequest; usage?: Usage; debug?: AskDebug };
       const activeRun = get().guideRun;
       if (activeRun && (usage || debug)) {
         set({ guideRun: {
@@ -889,7 +901,28 @@ async function runAgent(
           },
         } });
       }
-      if (!action || !['navigate', 'click', 'fill', 'finish'].includes(action.type)) throw new Error('The agent returned an invalid action.');
+      if (!proposed || !['navigate', 'click', 'fill', 'finish'].includes(proposed.type)) throw new Error('The agent returned an invalid action.');
+      const key = actionKey(proposed);
+      const recent = history.slice(-2);
+      if (proposed.type !== 'finish' && recent.length === 2 && recent.every((h) => h.action === key) && recent[0].observation === recent[1].observation) {
+        stopReason = `The agent kept repeating “${proposedInstruction}” with no change on the page.`;
+        break;
+      }
+      // Repeating past work after the state check passed is a loop, not progress: the task is done.
+      const sandboxState = site ? get().sandboxSessions[site] : null;
+      const satisfied = proposed.type !== 'finish' && history.some((h) => h.action === key) && !!sandboxState && verifySandboxTask(task, sandboxState, get().library, initialState).completed;
+      const action: BrowserAction = satisfied ? { type: 'finish' } : proposed;
+      const instruction = satisfied ? 'Finish: the requested outcome is already in place.' : proposedInstruction;
+      // Sandbox state is the source of truth: a premature finish goes back to the agent with what is missing.
+      if (action.type === 'finish' && site && corrections < MAX_AGENT_CORRECTIONS) {
+        const current = get().sandboxSessions[site];
+        const check = current ? verifySandboxTask(task, current, get().library, initialState) : null;
+        if (check?.supported && !check.completed) {
+          corrections++;
+          history.push({ instruction, action: 'finish (rejected)', observation: `Completion check failed: ${check.reason}` });
+          continue;
+        }
+      }
       // Manual mode: pause on every executable step. Auto mode: pause only for irreversible actions.
       const risk = site ? actionRisk(action) : null;
       const manual = get().uiMode === 'manual' && action.type !== 'finish';
@@ -934,7 +967,10 @@ async function runAgent(
       } else {
         throw new Error('This external page is a read-only snapshot. Open an interactive Guide sandbox to click buttons or submit forms.');
       }
-      history.push({ instruction, action: `${action.type} ${action.id || action.url || ''}`, observation: observation.slice(0, 5000) });
+      // Report sandbox state checks after every action, so the agent knows when to stop instead of looping to the step limit.
+      const checked = site && get().sandboxSessions[site] ? verifySandboxTask(task, get().sandboxSessions[site]!, get().library, initialState) : null;
+      if (checked?.supported) observation = `${checked.completed ? 'Completion check: passed. Finish now unless a requested step remains.' : `Completion check: not yet. ${checked.reason}`}\n${observation}`;
+      history.push({ instruction, action: actionKey(action), observation: observation.slice(0, 5000) });
       set({ guide: null });
       await captureStep(get, set, idx, evidence, alive, selection);
       if (!alive()) return;
@@ -949,6 +985,7 @@ async function runAgent(
   }
   if (!await ready()) return;
   set({ guide: null });
+  set({ guideRun: { ...get().guideRun!, activity: 'Checking the task outcome…' } });
   const state = site ? get().sandboxSessions[site] : null;
   const known = state ? verifySandboxTask(task, state, get().library, initialState) : null;
   let verified: VerificationResult = { completed: false, reason: 'No completion check ran.', answer: '', source: 'unavailable' };
@@ -985,6 +1022,7 @@ async function runAgent(
   // The model writes the answer from actual outcomes and explicitly selected evidence.
   // The verified runtime status cannot be upgraded by the summarizer.
   if (!failure && !stopReason) {
+    set({ guideRun: { ...get().guideRun!, activity: 'Preparing the answer…' } });
     try {
       const res = await fetch('/api/summarize', {
         method: 'POST', signal,
@@ -1027,6 +1065,7 @@ async function captureStep(
   const currentDoc = get().doc;
   if (!currentDoc || !alive()) return;
   const doc = pageWithSelection(currentDoc, currentDoc.sandbox && step > 0 ? null : selection);
+  set({ guideRun: { ...get().guideRun!, activity: 'Capturing a page screenshot…' } });
   const previousEvidence = get().evidence;
   const index = get().scratchpad.length + 1;
   const requestedTarget = ev?.targetId && doc.blocks.some((b) => b.id === ev.targetId) ? ev.targetId : null;
@@ -1034,7 +1073,7 @@ async function captureStep(
   if (ev && proofIds.length) set({ evidence: proofIds.map((id) => ({ id, marker: String(index) })), focusedEvidence: null });
   try {
     const { capturePageWithBox } = await import('./capture-page');
-    const { imageUrl, box } = await capturePageWithBox(ev?.annotate && requestedTarget ? requestedTarget : undefined);
+    const { imageUrl, box } = await capturePageWithBox(ev?.annotate && requestedTarget ? requestedTarget : undefined, agentAbort?.signal);
     if (!alive()) return;
     const capturedAt = new Date().toISOString();
     const run = get().guideRun!;

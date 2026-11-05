@@ -302,6 +302,11 @@ export function applySandboxAction(s: SandboxState, action: BrowserAction, lib: 
   return { state: n, observation: sandboxDoc(n, lib).blocks.filter((b) => !b.control).map((b) => b.text).join('\n') };
 }
 
+const MET_AMENITY_TERMS: [RegExp, string][] = [
+  [/\b(restrooms?|bathrooms?|toilets?)\b/i, 'restrooms'], [/\bcoffee\b/i, 'coffee-shops'], [/\b(dining|restaurants?|caf[eé]s?|somewhere to eat)\b/i, 'dining'],
+  [/\binfo(rmation)? desk\b/i, 'information-desk'], [/\b(lactation|nursing) room\b/i, 'lactation-room'], [/\b(retail|gift shops?|museum stores?)\b/i, 'retail'], [/\b(water fountains?|drinking water)\b/i, 'water-fountains'],
+];
+
 export function verifySandboxTask(task: string, s: SandboxState, lib: Library, initial?: SandboxState): { supported: boolean; completed: boolean; answer: string; reason: string } {
   const checks: { passed: boolean; result: string; missing: string }[] = [];
   const mentioned = lib.products.filter((p) => new RegExp(`\\b${p.id.replace(/s$/, '')}s?\\b`, 'i').test(task));
@@ -345,8 +350,20 @@ export function verifySandboxTask(task: string, s: SandboxState, lib: Library, i
     // Accept any gallery that legitimately matches the task name (two galleries are "European Paintings").
     const rooms = /temple/i.test(task) ? ['temple'] : /european paintings|impressionists/i.test(task) ? ['impressionists', 'european-old-masters']
       : ROOMS.filter(room => task.toLowerCase().includes(room.title.toLowerCase()) || new RegExp(`\\b${room.gallery}\\b`).test(task)).map(room => room.id);
-    if (/\bfloor 2\b/i.test(task)) checks.push({ passed: s.mapFloor === 2, result: 'Floor 2 is open on the map.', missing: 'Floor 2 is not open.' });
-    if (/\b(open|find|locate|show)\b/i.test(task) && rooms.length) checks.push({ passed: rooms.includes(s.selected), result: 'The requested gallery is selected on the museum map.', missing: 'The requested gallery is not selected on the map.' });
+    // The last floor named is the destination: "go from Floor 2 to Floor 1" ends on Floor 1.
+    const floor = Number(Array.from(task.matchAll(/\bfloor\s*([12])\b/gi)).pop()?.[1] || 0);
+    if (floor) checks.push({ passed: s.mapFloor === floor, result: `Floor ${floor} is open on the map.`, missing: `Floor ${floor} is not open.` });
+    const place = MET_PLACES.find(p => task.toLowerCase().includes(p.name.toLowerCase()));
+    const amenity = MET_AMENITY_TERMS.find(([pattern]) => pattern.test(task))?.[1];
+    if (place) checks.push({ passed: s.mapPlace === place.id, result: `${place.name} is selected on the museum map.`, missing: `${place.name} is not selected on the map.` });
+    else if (amenity) {
+      const shown = new Set(sandboxDoc(s, lib).blocks.map(b => b.id));
+      checks.push({ passed: placesForAmenity(amenity).some(p => p.id === s.mapPlace || shown.has(`place-${p.id}`)), result: 'The requested museum services are shown on the map.', missing: 'The requested museum services are not shown on the map.' });
+    } else if (rooms.length && /\b(open|find|locate|show|go to|navigate|take me|directions?|route)\b/i.test(task)) checks.push({ passed: rooms.includes(s.selected), result: 'The requested gallery is selected on the museum map.', missing: 'The requested gallery is not selected on the map.' });
+    if (/\b(directions?|route)\b/i.test(task) && !/\b(hide|clear|remove|close)\b/i.test(task)) checks.push({ passed: Boolean(s.mapRouting), result: 'The walking route is displayed.', missing: 'The walking route is not displayed. Select the destination, then use Get directions.' });
+    const startZoom = initial?.mapZoom || 1, zoom = s.mapZoom || 1;
+    if (/\bzoom(ed|ing)?\s+in\b/i.test(task)) checks.push({ passed: zoom > startZoom, result: `The map zoomed in to ${zoom}.`, missing: 'The map has not zoomed in.' });
+    if (/\bzoom(ed|ing)?\s+out\b/i.test(task)) checks.push({ passed: zoom < startZoom, result: `The map zoomed out to ${zoom}.`, missing: 'The map has not zoomed out.' });
   }
   if (!checks.length) return { supported: false, completed: false, answer: 'This task needs page-evidence verification.', reason: 'No deterministic state check applies to this task.' };
   const completed = checks.every((c) => c.passed), reason = completed ? 'All requested state changes were checked against the actual sandbox state.' : checks.filter((c) => !c.passed).map((c) => c.missing).join(' ');

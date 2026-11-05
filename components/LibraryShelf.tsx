@@ -11,7 +11,7 @@ export const SANDBOX_TASKS: Record<SandboxSite, string[]> = {
   amazon: ['Add oranges to my cart', 'Buy oranges using demo checkout', 'Save coffee to my wishlist'],
   quora: ['Change my language to Spanish', 'Find and browse posts about gardening', 'Follow the Gardening topic', 'Publish a demo question about gardening'],
   soundcloud: ['Play Midnight Signals', 'Like Midnight Signals', 'Follow Nova Vale'],
-  'met-map': ['Open Arms and Armor', 'Find the European Paintings galleries on Floor 2', 'Switch to Floor 2 and open Modern and Contemporary Art'],
+  'met-map': ['Open The Great Hall', 'Find the European Paintings galleries on Floor 2', 'Switch to Floor 2 and open Modern and Contemporary Art'],
 };
 
 const FIND_EXAMPLE = 'When did the Berlin Wall fall?';
@@ -24,7 +24,7 @@ const GUIDE_SITES: { id: SandboxSite; name: string; description: string }[] = [
 ];
 
 export default function LibraryShelf() {
-  const { library, pageError, loadUrl, stageExampleRequest } = useStore();
+  const { library, pageError, loadUrl, stageExampleRequest, uiMode, setUiMode } = useStore();
   useEffect(() => {
     const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
     if (connection?.saveData) return;
@@ -62,7 +62,7 @@ export default function LibraryShelf() {
             <h3 className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-muted dark:text-night-muted">Or open a page to ask your own question</h3>
             <div className="grid auto-rows-fr gap-2 sm:grid-cols-2">
               {['roman-empire', 'blue-sky', 'web-accessibility', 'cold-war'].flatMap((id) => library.articles.filter((article) => article.id === id)).map((article) => (
-                <button key={article.id} onPointerEnter={() => prefetchSavedPage(article.id)} onFocus={() => prefetchSavedPage(article.id)} onClick={() => void loadUrl(articleUrl(article.id, library))} className="library-card library-card--compact text-left">
+                <button key={article.id} onPointerEnter={() => prefetchSavedPage(article.id)} onFocus={() => prefetchSavedPage(article.id)} onClick={() => { setUiMode('find'); void loadUrl(articleUrl(article.id, library)); }} className="library-card library-card--compact text-left">
                   <span className="block text-[11px] font-semibold uppercase tracking-wide text-orange">{article.site}</span>
                   <span className="mt-0.5 block truncate text-sm font-semibold leading-snug" title={article.title}>{article.title}</span>
                   <span className="mt-2 block text-xs font-medium text-orange">Open →</span>
@@ -93,7 +93,7 @@ export default function LibraryShelf() {
             <h3 className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-muted dark:text-night-muted">Or open a demo website to try your own task</h3>
             <div className="grid auto-rows-fr gap-2 sm:grid-cols-2">
               {GUIDE_SITES.map((site) => (
-                <button key={site.id} onClick={() => void loadUrl(sandboxUrl(site.id))} className="library-card library-card--compact text-left">
+                <button key={site.id} onClick={() => { if (uiMode === 'find') setUiMode('auto'); void loadUrl(sandboxUrl(site.id)); }} className="library-card library-card--compact text-left">
                   <span className="block text-sm font-semibold leading-snug">{site.name}</span>
                   <span className="mt-1 block truncate text-xs leading-snug text-muted dark:text-night-muted" title={site.description}>{site.description}</span>
                   <span className="mt-2 block text-xs font-medium text-orange">Open →</span>
