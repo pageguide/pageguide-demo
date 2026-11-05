@@ -53,7 +53,7 @@ export default function LibraryShelf() {
                 <div><dt className="inline font-semibold text-ink dark:text-night-ink">Manual</dt>{' · '}<dd className="inline">You approve each step</dd></div>
               </dl>
             </div>
-            <ExampleMedia mode="Guide" type="video" src="/demo-media/guide-latest.mp4?v=latest-c4b21506" gifSrc="/demo-media/guide-latest.gif?v=latest-c4b21506" poster="/examples/guide-demo-poster.jpg" captionsSrc="/examples/guide-demo.en.vtt" alt="Guide demonstration video" width={1920} height={1080} />
+            <ExampleMedia mode="Guide" type="video" src="/demo-media/guide-latest.mp4?v=latest-c4b21506" gifSrc="/demo-media/guide-latest.gif?v=latest-c4b21506-15x" gifSeekSrc="/demo-media/guide-gif-seekable.mp4?v=latest-c4b21506-15x" gifPlaybackRate={1.5} poster="/examples/guide-demo-poster.jpg" captionsSrc="/examples/guide-demo.en.vtt" alt="Guide demonstration video" width={1920} height={1080} />
             <h3 className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-muted dark:text-night-muted">Or open a demo website to try your own task</h3>
             <div className="grid auto-rows-fr gap-2 sm:grid-cols-2">
               {GUIDE_SITES.map((site) => (

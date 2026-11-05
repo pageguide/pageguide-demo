@@ -17,7 +17,10 @@ test('playground shows the supplied Find image and playable Guide video', async 
   const formats = guide.getByRole('group', { name: 'Guide example format' });
   await expect(formats.getByRole('button', { name: 'GIF', exact: true })).toHaveAttribute('aria-pressed', 'true');
   const gif = guide.getByRole('img');
-  await expect(gif).toHaveAttribute('src', '/demo-media/guide-latest.gif?v=latest-c4b21506');
+  await expect(gif).toHaveAttribute('src', '/demo-media/guide-latest.gif?v=latest-c4b21506-15x');
+  await expect(guide.getByText(/1.5×/)).toBeVisible();
+  const sideCaptions = page.getByRole('complementary', { name: 'Side captions' });
+  await expect(sideCaptions).toHaveCount(0);
   await expect.poll(() => gif.evaluate((element: HTMLImageElement) => element.naturalWidth), { timeout: 20000 }).toBe(1920);
   await formats.getByRole('button', { name: 'Video', exact: true }).click();
   const video = guide.getByLabel('Guide demonstration video', { exact: true });
@@ -33,8 +36,8 @@ test('playground shows the supplied Find image and playable Guide video', async 
   await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime), { timeout: 10000 }).toBeGreaterThan(0.1);
   await video.evaluate((element: HTMLVideoElement) => element.pause());
   expect(await video.evaluate((element: HTMLVideoElement) => element.muted)).toBe(true);
-  await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.textTracks[0]?.mode)).toBe('showing');
-  await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.textTracks[0]?.cues?.length || 0)).toBeGreaterThan(0);
+  await expect(video.locator('track')).toHaveCount(0);
+  await expect(sideCaptions).toHaveCount(0);
   await expect(page.getByRole('textbox', { name: 'Search or enter website URL' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Go', exact: true })).toHaveCount(0);
   await expect(page.locator('.library-card')).toHaveCount(8);
@@ -65,6 +68,37 @@ test('media examples and website rows align and fit on desktop', async ({ page }
   }
 });
 
+for (const format of ['GIF', 'Video'] as const) {
+  test(`${format} steps are hidden inline and clicking them seeks to the correct scene`, async ({ page }) => {
+    await page.goto('/');
+    if (format === 'Video') await page.getByRole('button', { name: 'Video', exact: true }).click();
+    await expect(page.getByRole('complementary', { name: 'Side captions' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Enlarge Guide example', exact: true }).click();
+    const overlay = page.getByRole('dialog', { name: 'Guide example', exact: true });
+    const player = overlay.locator('video');
+    await expect.poll(() => player.evaluate((video: HTMLVideoElement) => video.readyState), { timeout: 20000 }).toBeGreaterThanOrEqual(1);
+    const captions = overlay.getByRole('complementary', { name: 'Side captions' });
+    await expect(captions.getByRole('listitem')).toHaveCount(3);
+    const scale = format === 'GIF' ? 1.5 : 1;
+    const second = captions.getByRole('button', { name: 'Go to step 2: Search nearby cafés' });
+    await second.focus();
+    await second.press('Enter');
+    await player.evaluate((video: HTMLVideoElement) => video.pause());
+    await expect.poll(() => player.evaluate((video: HTMLVideoElement) => video.currentTime)).toBeGreaterThanOrEqual(8 / scale - .05);
+    expect(await player.evaluate((video: HTMLVideoElement) => video.currentTime)).toBeLessThan(8 / scale + 1);
+    await expect(captions.locator('[aria-current="step"]')).toContainText('Search nearby cafés');
+    await captions.getByRole('button', { name: 'Go to step 3: Show the café and evidence' }).click();
+    await player.evaluate((video: HTMLVideoElement) => video.pause());
+    await expect.poll(() => player.evaluate((video: HTMLVideoElement) => video.currentTime)).toBeGreaterThanOrEqual(15 / scale - .05);
+    expect(await player.evaluate((video: HTMLVideoElement) => video.currentTime)).toBeLessThan(15 / scale + 1);
+    await expect(captions.locator('[aria-current="step"]')).toContainText('Show the café and evidence');
+    await captions.getByRole('button', { name: 'Go to step 1: Open the museum map' }).click();
+    await expect(captions.locator('[aria-current="step"]')).toContainText('Open the museum map');
+    await overlay.getByRole('button', { name: 'Close example' }).click();
+    await expect(page.getByRole('complementary', { name: 'Side captions' })).toHaveCount(0);
+  });
+}
+
 for (const mode of ['Find', 'Guide'] as const) {
   test(`${mode} media opens an overlay and closes with Escape or the close button`, async ({ page }) => {
     await page.goto('/');
@@ -77,8 +111,17 @@ for (const mode of ['Find', 'Guide'] as const) {
     await expect(mode === 'Find' ? media : media.locator('source').first()).toHaveAttribute('src', mode === 'Find' ? '/examples/find-anchored-evidence.png' : '/demo-media/guide-latest.mp4?v=latest-c4b21506');
     if (mode === 'Guide') {
       expect(await media.evaluate((element: HTMLVideoElement) => element.muted)).toBe(false);
-      await expect(media.locator('track')).toHaveAttribute('src', '/examples/guide-demo.en.vtt');
-      await expect.poll(() => media.evaluate((element: HTMLVideoElement) => element.textTracks[0]?.mode)).toBe('showing');
+      await expect(media.locator('track')).toHaveCount(0);
+      const captions = overlay.getByRole('complementary', { name: 'Side captions' });
+      await expect(captions).toContainText('Ask PageGuide.');
+      await expect(captions.getByRole('listitem')).toHaveCount(3);
+      await media.evaluate((element: HTMLVideoElement) => { element.pause(); element.currentTime = 10; });
+      await expect(captions.locator('[aria-current="step"]')).toContainText('Search nearby cafés');
+      await media.evaluate((element: HTMLVideoElement) => { element.currentTime = 18; });
+      await expect(captions.locator('[aria-current="step"]')).toContainText('Show the café and evidence');
+      const videoBox = await media.boundingBox();
+      const captionBox = await captions.boundingBox();
+      expect(captionBox!.x).toBeGreaterThanOrEqual(videoBox!.x + videoBox!.width);
     }
     await page.keyboard.press('Escape');
     await expect(overlay).toHaveCount(0);
