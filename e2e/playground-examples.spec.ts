@@ -17,7 +17,7 @@ test('playground shows the supplied Find image and playable Guide video', async 
   const formats = guide.getByRole('group', { name: 'Guide example format' });
   await expect(formats.getByRole('button', { name: 'GIF', exact: true })).toHaveAttribute('aria-pressed', 'true');
   const gif = guide.getByRole('img');
-  await expect(gif).toHaveAttribute('src', '/demo-media/guide-latest.gif?v=latest-fd99f8bb-15x');
+  await expect(gif).toHaveAttribute('src', '/demo-media/guide-latest.gif?v=latest-256058da-15x');
   await expect(guide.getByText(/1.5×/)).toBeVisible();
   const sideCaptions = page.getByRole('complementary', { name: 'Side captions' });
   await expect(sideCaptions).toHaveCount(0);
@@ -27,11 +27,11 @@ test('playground shows the supplied Find image and playable Guide video', async 
   await expect(findImage).toHaveAttribute('src', '/examples/find-anchored-evidence.png');
   await expect(findImage).toBeVisible();
   await expect.poll(() => findImage.evaluate((element: HTMLImageElement) => element.naturalWidth), { timeout: 20000 }).toBeGreaterThan(0);
-  await expect(video.locator('source').first()).toHaveAttribute('src', '/demo-media/guide-latest.mp4?v=latest-fd99f8bb');
-  await expect(video.locator('source').nth(1)).toHaveAttribute('src', '/demo-media/guide-latest.webm?v=latest-fd99f8bb');
+  await expect(video.locator('source').first()).toHaveAttribute('src', '/demo-media/guide-latest.mp4?v=latest-256058da');
+  await expect(video.locator('source').nth(1)).toHaveAttribute('src', '/demo-media/guide-latest.webm?v=latest-256058da');
   await expect(video).toHaveAttribute('controls', '');
   await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState), { timeout: 20000 }).toBeGreaterThanOrEqual(1);
-  expect(await video.evaluate((element: HTMLVideoElement) => element.duration)).toBeCloseTo(11.9, 0);
+  expect(await video.evaluate((element: HTMLVideoElement) => element.duration)).toBeCloseTo(13.13, 0);
   await video.evaluate((element: HTMLVideoElement) => element.play());
   await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime), { timeout: 10000 }).toBeGreaterThan(0.1);
   await video.evaluate((element: HTMLVideoElement) => element.pause());
@@ -108,7 +108,7 @@ for (const mode of ['Find', 'Guide'] as const) {
     const overlay = page.getByRole('dialog', { name: `${mode} example`, exact: true });
     await expect(overlay).toBeVisible();
     const media = mode === 'Find' ? overlay.getByRole('img') : overlay.getByLabel('Guide demonstration video', { exact: true });
-    await expect(mode === 'Find' ? media : media.locator('source').first()).toHaveAttribute('src', mode === 'Find' ? '/examples/find-anchored-evidence.png' : '/demo-media/guide-latest.mp4?v=latest-fd99f8bb');
+    await expect(mode === 'Find' ? media : media.locator('source').first()).toHaveAttribute('src', mode === 'Find' ? '/examples/find-anchored-evidence.png' : '/demo-media/guide-latest.mp4?v=latest-256058da');
     if (mode === 'Guide') {
       expect(await media.evaluate((element: HTMLVideoElement) => element.muted)).toBe(false);
       await expect(media.locator('track')).toHaveCount(0);

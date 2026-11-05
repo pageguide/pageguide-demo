@@ -2,14 +2,15 @@
 
 The playground's GIF / Video switch uses the latest demo from `main`:
 
-- `latest.mp4`: original latest video, preserved unchanged (HEVC/AAC, 1440×1080, about 11.9 seconds; imported from main at `423d4f4`).
-- `latest.gif`: regenerated from `latest.mp4` at **1440×1080**, 12 fps, looping at **1.5× speed** (about 7.91 seconds). It preserves the step labels already embedded in the new source video; no additional captions are burned in. A numbered 1–3 explanation appears only in the enlarged view, with the active step highlighted. This replaces the 426×240 GIF supplied by main at commit `bd3ae9e` (recoverable from Git if needed).
+- `latest.mp4`: original latest video, preserved unchanged (HEVC/AAC, 1440×1080, about 13.13 seconds; imported from `0820-copy(2).mp4`).
+- `latest.gif`: regenerated from `latest.mp4` at **1440×1080**, 12 fps, looping at **1.5× speed** (about 8.75 seconds). It preserves the step labels already embedded in the new source video; no additional captions are burned in. A numbered 1–3 explanation appears only in the enlarged view, with the active step highlighted. This replaces the 426×240 GIF supplied by main at commit `bd3ae9e` (recoverable from Git if needed).
 - `guide-demo-browser.mp4`: H.264/AAC copy of the latest video at 1440×1080. Original audio retained.
 - `guide-demo-browser.webm`: VP9/Opus fallback for browsers without H.264 support.
 - `guide-gif-seekable.mp4` / `.webm`: silent video encodings of the actual accelerated GIF, used only for its enlarged, seekable preview. The inline preview remains the real GIF.
 - `../public/examples/guide-demo-poster.jpg`: latest first-frame preview.
 - `../public/examples/guide-demo.en.vtt`: English captions transcribed from the latest narration.
-- `legacy/0820(2).mp4`: previous original video, retained by main.
+- `legacy/0820-copy(3).mp4`: previous original latest video.
+- `legacy/0820-copy.mp4` and `legacy/0820(2).mp4`: earlier original videos.
 
 The Guide card defaults to GIF. Inline previews hide the additional narration/navigation panel; labels embedded in the source video remain visible. Click the GIF or Enlarge to reveal the step panel. Video step highlights follow playback/seeking (0–6 seconds: map; 6–10.3 seconds: search; 10.3+ seconds: annotated result), with the matching spoken narration beside the video. GIF highlights use the silent seekable player's actual playback clock, adjusted for 1.5× speed. Every numbered step is clickable (and keyboard accessible) to seek to its exact scene and resume playback; the active step also follows manual seeking. The GIF preview loops silently. No captions cover the bottom of the media. On narrow screens, the enlarged panel moves below the media without covering it. The inline video is muted; enlarged playback enables sound by default. GIF has no audio.
 
