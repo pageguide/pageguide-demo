@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('SoundCloud plays actual audio, seeks, saves likes, filters library, and follows artists', async ({ page }) => {
-  await page.getByRole('button', { name: /SoundCloud sandbox/ }).click();
+  await page.getByRole('button', { name: /SoundCloud .*Open/ }).click();
   const site = page.locator('[data-sandbox-root]');
   await expect(site.locator('.sc-app')).toBeVisible();
   await page.screenshot({ path: '/tmp/soundcloud-home.png' });
@@ -27,7 +27,7 @@ test('SoundCloud plays actual audio, seeks, saves likes, filters library, and fo
 });
 
 test('museum supports map selection, routes, floors, search, zoom, and amenity toggles', async ({ page }) => {
-  await page.getByRole('button', { name: /The Met Map sandbox/ }).click();
+  await page.getByRole('button', { name: /The Met Map .*Open/ }).click();
   const site = page.locator('[data-sandbox-root]');
   // Select an SVG room via keyboard, then exercise the shared reducer-backed controls.
   await site.locator('[data-node-id="room-temple"]').focus();
@@ -47,7 +47,7 @@ test('museum supports map selection, routes, floors, search, zoom, and amenity t
 });
 
 test('Amazon home promos, product sorting, cart quantities and wishlist are functional', async ({ page }) => {
-  await page.getByRole('button', { name: /Amazon sandbox/ }).click();
+  await page.getByRole('button', { name: /Amazon .*Open/ }).click();
   const site = page.locator('[data-sandbox-root]');
   await expect(site.locator('.az-home-promos')).toBeVisible();
   await page.screenshot({ path: '/tmp/amazon-home.png' });

@@ -71,7 +71,7 @@ test('Guide acts on the real sandbox state and shows both screenshots and on-pag
     return r.fulfill({ json: { instruction: 'Confirm oranges are in the cart.', action: { type: 'finish' }, evidence: { name: 'cart-confirmation', description: 'Fresh oranges shown in the shopping cart' } } });
   });
   await page.goto('/');
-  await page.getByRole('button', { name: /Amazon sandbox/ }).click();
+  await page.getByRole('button', { name: /Amazon .*Open/ }).click();
   await page.locator('[data-node-id="current-state"]').evaluate((el) => {
     const range = el.ownerDocument.createRange(); range.selectNodeContents(el);
     const selection = el.ownerDocument.getSelection()!; selection.removeAllRanges(); selection.addRange(range);
@@ -173,7 +173,7 @@ test('admin mode exposes Guide request diagnostics and usage', async ({ page }) 
     debug: { provider: 'openai', model: 'gpt-4o-mini', system: 'Complete the task safely.', input: '{"task":"Add oranges"}', images: [], rawOutput: '{"action":{"type":"finish"}}' },
   } }));
   await page.goto('/');
-  await page.getByRole('button', { name: /Amazon sandbox/ }).click();
+  await page.getByRole('button', { name: /Amazon .*Open/ }).click();
   await page.getByRole('button', { name: 'Auto', exact: true }).click();
   await page.getByRole('textbox', { name: 'Message PageGuide' }).fill('Add oranges to my cart');
   await page.getByRole('button', { name: 'Send', exact: true }).click();

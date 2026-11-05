@@ -8,7 +8,7 @@ test.beforeEach(async ({ page }) => {
 
 test('demo checkout requires shipping and review, creates a paid order, and supports cancellation', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: /Amazon sandbox/ }).click();
+  await page.getByRole('button', { name: /Amazon .*Open/ }).click();
   const site = page.locator('[data-sandbox-root]');
   await site.getByRole('button', { name: 'Add fresh oranges to cart', exact: true }).click();
   await site.getByRole('button', { name: 'Cart (1)', exact: true }).click();
@@ -39,7 +39,7 @@ test('Guide completes demo payment and saves the actual paid-order confirmation'
   });
   await page.route('**/api/summarize', (r) => { const data = r.request().postDataJSON(); return r.fulfill({ json: { answer: `${data.outcome} ${data.evidence.map((e: any) => `[EV:${e.name}]`).join(' ')}` } }); });
   await page.goto('/');
-  await page.getByRole('button', { name: /Amazon sandbox/ }).click();
+  await page.getByRole('button', { name: /Amazon .*Open/ }).click();
   await page.getByRole('button', { name: 'Guide: Buy oranges using demo checkout', exact: true }).click();
   await page.getByRole('button', { name: 'Send', exact: true }).click();
   await expect(page.getByText('Completed', { exact: true })).toBeVisible({ timeout: 25000 });
@@ -66,7 +66,7 @@ test('checkout verification distinguishes reviewing from paying and rejects dupl
 
 test('Quora includes multiple answers/comments and supports posting, voting, saving and following', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: /Quora sandbox/ }).click();
+  await page.getByRole('button', { name: /Quora .*Open/ }).click();
   const site = page.locator('[data-sandbox-root]');
   await site.getByRole('button', { name: 'Follow Gardening', exact: true }).click();
   await expect(site.locator('[data-node-id="current-state"]')).toContainText('Followed topics: Gardening');

@@ -76,7 +76,7 @@ body {
 }
 .library-card:hover { border-color: #e89c6b; box-shadow: 0 4px 16px #dd7e3314; }
 .dark .library-card { background: #242820; border-color: #3a4034; color: #eceee6; }
-.library-card--compact { height: clamp(10rem, 22vh, 14rem); padding: 12px; border-radius: 12px; overflow: hidden; }
+.library-card--compact { padding: 12px; border-radius: 12px; }
 .library-card-description { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .sandbox-button {
   display: inline-flex;

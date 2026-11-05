@@ -11,7 +11,7 @@ test.beforeEach(async ({ page }) => {
 
 test('Amazon manual controls change cart quantities and sandbox sessions stay isolated', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: /Amazon sandbox/ }).click();
+  await page.getByRole('button', { name: /Amazon .*Open/ }).click();
   const site = page.locator('[data-sandbox-root]');
   await site.getByRole('button', { name: 'Add fresh oranges to cart', exact: true }).click();
   await site.getByRole('button', { name: 'Cart (1)', exact: true }).click();
@@ -19,10 +19,10 @@ test('Amazon manual controls change cart quantities and sandbox sessions stay is
   await site.getByRole('button', { name: 'Increase fresh oranges quantity', exact: true }).click();
   await expect(site.getByText('Subtotal: $9.98', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Open library', exact: true }).click();
-  await page.getByRole('button', { name: /Quora sandbox/ }).click();
+  await page.getByRole('button', { name: /Quora .*Open/ }).click();
   await expect(site.locator('[data-node-id="current-state"]')).toContainText('Saved language: English');
   await page.getByRole('button', { name: 'Open library', exact: true }).click();
-  await page.getByRole('button', { name: /Amazon sandbox/ }).click();
+  await page.getByRole('button', { name: /Amazon .*Open/ }).click();
   await site.getByRole('button', { name: 'Cart (2)', exact: true }).click();
   await site.getByRole('button', { name: 'Remove fresh oranges', exact: true }).click();
   await expect(site.getByText('Your cart is empty.', { exact: true })).toBeVisible();
@@ -32,7 +32,7 @@ test('Amazon manual controls change cart quantities and sandbox sessions stay is
 
 test('Back returns a first visited page to the library', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: /Amazon sandbox/ }).click();
+  await page.getByRole('button', { name: /Amazon .*Open/ }).click();
   const back = page.getByRole('button', { name: 'Back', exact: true });
   await expect(back).toBeEnabled();
   await back.click();
@@ -41,11 +41,11 @@ test('Back returns a first visited page to the library', async ({ page }) => {
 
 test('opening a new site from the library starts fresh history', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: /Amazon sandbox/ }).click();
+  await page.getByRole('button', { name: /Amazon .*Open/ }).click();
   const back = page.getByRole('button', { name: 'Back', exact: true });
   await expect(back).toBeEnabled();
   await back.click();
-  await page.getByRole('button', { name: /Quora sandbox/ }).click();
+  await page.getByRole('button', { name: /Quora .*Open/ }).click();
   await expect(back).toBeEnabled();
   await back.click();
   await expect(page.getByRole('region', { name: 'Find saved websites', exact: true })).toBeVisible();
@@ -53,7 +53,7 @@ test('opening a new site from the library starts fresh history', async ({ page }
 
 test('Quora manual settings, search, browsing, upvote, and back navigation work', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: /Quora sandbox/ }).click();
+  await page.getByRole('button', { name: /Quora .*Open/ }).click();
   const site = page.locator('[data-sandbox-root]');
   await site.getByRole('button', { name: 'Settings', exact: true }).click();
   await site.getByRole('button', { name: 'Spanish', exact: true }).click();
@@ -87,7 +87,7 @@ test('agent receives fresh Quora state, saves only selected evidence, and attach
     } });
   });
   await page.goto('/');
-  await page.getByRole('button', { name: /Quora sandbox/ }).click();
+  await page.getByRole('button', { name: /Quora .*Open/ }).click();
   await page.getByRole('button', { name: 'Guide: Change my language to Spanish', exact: true }).click();
   await page.getByRole('button', { name: 'Send', exact: true }).click();
   await expect(page.getByText('Completed', { exact: true })).toBeVisible({ timeout: 20000 });
@@ -107,7 +107,7 @@ test('agent receives fresh Quora state, saves only selected evidence, and attach
 test('a premature finish cannot falsely complete the task', async ({ page }) => {
   await page.route('**/api/agent', (r) => r.fulfill({ json: { instruction: 'Finish without adding anything.', action: { type: 'finish' } } }));
   await page.goto('/');
-  await page.getByRole('button', { name: /Amazon sandbox/ }).click();
+  await page.getByRole('button', { name: /Amazon .*Open/ }).click();
   await page.getByRole('button', { name: 'Guide: Add oranges to my cart', exact: true }).click();
   await page.getByRole('button', { name: 'Send', exact: true }).click();
   await expect(page.getByText('Incomplete', { exact: true })).toBeVisible({ timeout: 15000 });
@@ -125,7 +125,7 @@ test('clear chat cancels an in-flight agent action', async ({ page }) => {
     await r.fulfill({ json: { instruction: 'Add oranges.', action: { type: 'click', id: 'add-oranges' } } }).catch(() => {});
   });
   await page.goto('/');
-  await page.getByRole('button', { name: /Amazon sandbox/ }).click();
+  await page.getByRole('button', { name: /Amazon .*Open/ }).click();
   await page.getByRole('button', { name: 'Guide: Add oranges to my cart', exact: true }).click();
   await page.getByRole('button', { name: 'Send', exact: true }).click();
   await expect.poll(() => requested).toBe(true);
@@ -163,7 +163,7 @@ test('location display is read-only and follows page, cart, and library navigati
   await expect(location).toHaveText('PageGuide library');
   await expect(page.getByRole('button', { name: 'Go', exact: true })).toHaveCount(0);
   await expect(location.locator('input')).toHaveCount(0);
-  await page.getByRole('button', { name: /Amazon sandbox/ }).click();
+  await page.getByRole('button', { name: /Amazon .*Open/ }).click();
   await expect(location).toHaveText('https://amazon.pageguide.test/');
   await page.locator('[data-sandbox-root]').getByRole('button', { name: 'Cart (0)', exact: true }).click();
   await expect(location).toHaveText('https://amazon.pageguide.test/cart');

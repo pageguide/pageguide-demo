@@ -28,7 +28,7 @@ async function expectArrow(page: Page, id: string) {
 test('manual arrow follows each button, supports direct clicks and callout clicks, and performs each action only once', async ({ page }) => {
   test.setTimeout(90000);
   await setup(page, ['add-oranges', 'cart', 'increase-oranges']);
-  await page.getByRole('button', { name: /Amazon sandbox/ }).click();
+  await page.getByRole('button', { name: /Amazon .*Open/ }).click();
   await page.getByRole('button', { name: 'Manual', exact: true }).click();
   await page.getByRole('textbox', { name: 'Message PageGuide' }).fill('Add 2 oranges to my cart');
   await page.getByRole('button', { name: 'Send', exact: true }).click();
@@ -50,7 +50,7 @@ test('manual arrow follows each button, supports direct clicks and callout click
 test('manual callout remains within the browser pane after resize and stops cleanly', async ({ page }) => {
   test.setTimeout(90000);
   await setup(page, ['settings']);
-  await page.getByRole('button', { name: /Quora sandbox/ }).click();
+  await page.getByRole('button', { name: /Quora .*Open/ }).click();
   await page.getByRole('button', { name: 'Manual', exact: true }).click();
   await page.getByRole('button', { name: 'Guide: Change my language to Spanish', exact: true }).click();
   await page.getByRole('button', { name: 'Send', exact: true }).click();
@@ -73,7 +73,7 @@ test('manual callout remains within the browser pane after resize and stops clea
 test('museum manual arrows target the visible floor selector and clickable SVG gallery', async ({ page }) => {
   test.setTimeout(90000);
   await setup(page, ['floor-2', 'room-modern']);
-  await page.getByRole('button', { name: /The Met Map sandbox/ }).click();
+  await page.getByRole('button', { name: /The Met Map .*Open/ }).click();
   await page.getByRole('button', { name: 'Manual', exact: true }).click();
   await page.getByRole('button', { name: 'Guide: Switch to Floor 2 and open Modern and Contemporary Art', exact: true }).click();
   await page.getByRole('button', { name: 'Send', exact: true }).click();
@@ -121,7 +121,7 @@ test('manual arrows translate iframe coordinates and clicking the link approves 
 test('manual on-page clicks explicitly approve consequential steps without bypassing confirmation', async ({ page }) => {
   test.setTimeout(90000);
   await setup(page, ['post-question']);
-  await page.getByRole('button', { name: /Quora sandbox/ }).click();
+  await page.getByRole('button', { name: /Quora .*Open/ }).click();
   await page.locator('[data-sandbox-root] [data-node-id="ask-question"]').click();
   await page.getByRole('textbox', { name: 'Question title', exact: true }).fill('How should I water my gardening plants?');
   await page.getByRole('textbox', { name: 'Question details', exact: true }).fill('I would like practical advice for gardening in containers.');
@@ -140,7 +140,7 @@ test('manual on-page clicks explicitly approve consequential steps without bypas
 
 test('auto mode never shows a manual arrow', async ({ page }) => {
   await setup(page, ['add-oranges']);
-  await page.getByRole('button', { name: /Amazon sandbox/ }).click();
+  await page.getByRole('button', { name: /Amazon .*Open/ }).click();
   await page.getByRole('button', { name: 'Auto', exact: true }).click();
   await page.getByRole('button', { name: 'Guide: Add oranges to my cart', exact: true }).click();
   await page.getByRole('button', { name: 'Send', exact: true }).click();

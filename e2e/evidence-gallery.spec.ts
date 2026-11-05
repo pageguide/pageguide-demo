@@ -28,7 +28,7 @@ test('answer evidence starts collapsed, excludes intermediate captures, and fits
     return r.fulfill({ json: { answer: `Spanish is saved. [EV:${proof.name}]` } });
   });
   await page.goto('/');
-  await page.getByRole('button', { name: /Quora sandbox/ }).click();
+  await page.getByRole('button', { name: /Quora .*Open/ }).click();
   await page.getByRole('button', { name: 'Guide: Change my language to Spanish', exact: true }).click();
   await page.getByRole('button', { name: 'Send', exact: true }).click();
   await expect(page.getByText('Completed', { exact: true })).toBeVisible({ timeout: 20000 });
