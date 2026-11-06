@@ -5,8 +5,20 @@ import { createHash } from 'node:crypto';
 import files from '../lib/saved-files.json';
 import manifest from '../lib/saved-manifest.json';
 import library from '../lib/library-seed.json';
+import { FIND_PROMPTS } from '../components/LibraryShelf';
 
-test('all delivery copies are generated from the six repository originals and match their versions', async () => {
+test('each replacement page has three distinct example questions', () => {
+  expect(Object.keys(FIND_PROMPTS)).toEqual(library.articles.map(article => article.id));
+  for (const prompts of Object.values(FIND_PROMPTS)) {
+    expect(prompts).toHaveLength(3);
+    expect(new Set(prompts).size).toBe(3);
+    for (const prompt of prompts) expect(prompt).toMatch(/\?$/);
+  }
+});
+
+test('all four delivery copies match the new repository originals and their versions', async () => {
+  expect(Object.keys(files)).toEqual(['ronaldo', 'facebook', 'united-states', 'bible']);
+  expect(library.articles.map(article => article.id)).toEqual(Object.keys(files));
   for (const [id, filename] of Object.entries(files)) {
     const bytes = await readFile(`public/saved/${id}.json.gz`);
     const serialized = gunzipSync(bytes).toString('utf8');
@@ -19,27 +31,26 @@ test('all delivery copies are generated from the six repository originals and ma
     expect(doc.html).not.toMatch(/<script[\s>]/i);
     expect(doc.saved).toBe(true);
   }
-  expect(manifest['fetch-api'].bytes).toBeLessThan(350000);
-  expect(manifest['web-accessibility'].bytes).toBeLessThan(250000);
+  for (const info of Object.values(manifest)) expect(info.bytes).toBeLessThan(3_000_000);
 });
 
-test('Fetch API opens directly from static delivery, bypassing fetch and saved API functions', async ({ page }) => {
+test('Ronaldo opens directly from static delivery, bypassing fetch and saved API functions', async ({ page }) => {
   await page.route('**/api/library', (r) => r.fulfill({ json: { library } }));
   let dynamicRequests = 0;
   await page.route(/\/api\/(fetch|saved)(\/|\?|$)/, (r) => { dynamicRequests++; return r.abort(); });
   await page.goto('/');
-  await page.getByRole('region', { name: 'Find saved websites' }).getByRole('button').filter({ hasText: 'Fetch API' }).click();
-  await expect(page.frameLocator('iframe').locator('h1').first()).toContainText('Fetch API', { timeout: 15000 });
+  await page.getByRole('region', { name: 'Find saved websites' }).getByRole('button').filter({ hasText: 'Cristiano Ronaldo' }).click();
+  await expect(page.frameLocator('iframe').locator('h1').first()).toContainText('Cristiano Ronaldo', { timeout: 15000 });
   expect(dynamicRequests).toBe(0);
   await page.getByRole('button', { name: 'Refresh page', exact: true }).click();
-  await expect(page.frameLocator('iframe').locator('h1').first()).toContainText('Fetch API');
+  await expect(page.frameLocator('iframe').locator('h1').first()).toContainText('Cristiano Ronaldo');
   expect(dynamicRequests).toBe(0);
 });
 
 test('static assets advertise compression and long-lived caching', async ({ request }) => {
-  const res = await request.get(`/saved/fetch-api.json.gz?v=${manifest['fetch-api'].version}`);
+  const res = await request.get(`/saved/ronaldo.json.gz?v=${manifest.ronaldo.version}`);
   expect(res.ok()).toBe(true);
   expect(res.headers()['content-encoding']).toBe('gzip');
   expect(res.headers()['cache-control']).toContain('immutable');
-  expect((await res.json()).sourceFile).toBe(`save-webpage/${files['fetch-api']}`);
+  expect((await res.json()).sourceFile).toBe(`save-webpage/${files.ronaldo}`);
 });

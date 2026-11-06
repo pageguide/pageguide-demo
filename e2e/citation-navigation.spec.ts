@@ -5,12 +5,12 @@ import { selectFindPassages, validCitationQuote } from '../lib/find-passages';
 import { composeFindAnswer } from '../lib/find-answer';
 import type { PageDoc } from '../lib/types';
 
-test('long saved pages include and retrieve the actual Berlin Wall passage', () => {
-  const doc = JSON.parse(gunzipSync(readFileSync('public/saved/cold-war.json.gz')).toString()) as PageDoc;
-  const passage = doc.blocks.find((block) => block.text.includes('Berlin Wall in November 1989'));
+test('long saved pages retrieve relevant passages beyond the opening context', () => {
+  const doc = JSON.parse(gunzipSync(readFileSync('public/saved/united-states.json.gz')).toString()) as PageDoc;
+  const passage = doc.blocks.find((block) => block.type === 'paragraph' && block.text.includes('The First Amendment guarantees the free exercise of religion'));
   expect(passage).toBeDefined();
   expect(doc.blocks.indexOf(passage!)).toBeGreaterThan(220);
-  const selected = selectFindPassages(doc.blocks, 'When did the Berlin Wall fall?');
+  const selected = selectFindPassages(doc.blocks, 'How does the First Amendment protect the free exercise of religion?');
   expect(selected.length).toBeLessThanOrEqual(180);
   expect(selected).toContainEqual(passage);
   expect(doc.html).toContain(`data-pg-id="${passage!.id}"`);

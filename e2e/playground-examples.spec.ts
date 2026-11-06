@@ -49,7 +49,7 @@ test('playground shows the responsive Find example and playable Guide video', as
   await find.getByRole('button', { name: 'More examples' }).click();
   await guide.getByRole('button', { name: 'More examples' }).click();
   await expect(page.locator('.library-card')).toHaveCount(8);
-  await expect(find.locator('.library-card').first()).toContainText('Roman Empire');
+  await expect(find.locator('.library-card').first()).toContainText('Cristiano Ronaldo');
   const colors = await page.locator('.library-card').getByText('Open →', { exact: true }).evaluateAll(labels => labels.map(label => getComputedStyle(label).color));
   expect(new Set(colors).size).toBe(1);
 });

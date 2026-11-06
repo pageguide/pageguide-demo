@@ -136,11 +136,13 @@ test('clear chat cancels an in-flight agent action', async ({ page }) => {
   await expect(page.locator('[data-node-id="current-state"]')).toContainText('Cart contents: empty');
 });
 
-for (const id of ['fetch-api', 'blue-sky', 'web-accessibility', 'cold-war', 'manhattan', 'roman-empire']) {
+for (const id of ['ronaldo', 'facebook', 'united-states', 'bible']) {
   test(`saved original HTML loads: ${id}`, async ({ page }) => {
     const article = library.articles.find((a) => a.id === id)!;
     await page.goto('/');
-    const card = page.getByRole('region', { name: 'Find saved websites' }).getByRole('button').filter({ hasText: article.title });
+    const shelf = page.getByRole('region', { name: 'Find saved websites' });
+    if (id === 'united-states' || id === 'bible') await shelf.getByRole('button', { name: 'More examples', exact: true }).click();
+    const card = shelf.getByRole('button').filter({ hasText: article.title });
     await card.click();
     const frame = page.frameLocator('iframe');
     await expect(frame.locator('body')).toBeVisible({ timeout: 20000 });
@@ -149,10 +151,12 @@ for (const id of ['fetch-api', 'blue-sky', 'web-accessibility', 'cold-war', 'man
     await expect(frame.locator('[data-pg-id]').first()).toBeVisible();
     expect(await frame.locator('style').count()).toBeGreaterThan(0);
     await expect(page.getByText(/Original website HTML · saved/)).toBeVisible();
-    if (id === 'web-accessibility') {
-      // The W3C stylesheet must be bundled rather than depending on live asset requests.
-      expect(await frame.locator('style').first().textContent()).toContain('{');
-      await expect(frame.locator('link[rel="stylesheet"]')).toHaveCount(0);
+    const questions = page.getByRole('toolbar', { name: 'Find example requests' }).getByRole('button');
+    await expect(questions).toHaveCount(3);
+    for (const question of await questions.all()) {
+      const text = (await question.innerText()).replace(/^Find: /, '');
+      await question.click();
+      await expect(page.getByRole('textbox', { name: 'Message PageGuide' })).toHaveValue(text);
     }
   });
 }

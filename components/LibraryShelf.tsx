@@ -22,17 +22,17 @@ const GUIDE_SITES: { id: SandboxSite; name: string; description: string }[] = [
 ];
 
 export const FIND_PROMPTS: Record<string, string[]> = {
-  'roman-empire': ['When did the Roman Empire begin?', 'Which emperor divided the empire?'],
-  'blue-sky': ['What is Rayleigh scattering?', 'Why does the sky appear blue?'],
-  'web-accessibility': ['Why is web accessibility important?', 'Who benefits from accessible web design?'],
-  'cold-war': ['When did the Cold War begin?', 'What events led to its end?'],
+  'ronaldo': ['How did Ronaldo evolve from a winger into a goalscorer?', 'Which Champions League records does Ronaldo hold?', 'What major trophies has Ronaldo won with Portugal?'],
+  'facebook': ['How did Facebook expand beyond Harvard students?', 'What happened in the Cambridge Analytica scandal?', 'How does Facebook make money?'],
+  'united-states': ['How did the United States expand across North America?', 'How does the US government divide power among its branches?', 'Why does the United States have such diverse climates?'],
+  'bible': ['Why do different Christian traditions have different numbers of biblical books?', 'Which languages were the biblical texts originally written in?', 'What do the Dead Sea Scrolls reveal about the history of the Bible?'],
 };
 
 export default function LibraryShelf() {
   const { library, pageError, loadUrl, uiMode, setUiMode } = useStore();
   const [showAllFind, setShowAllFind] = useState(false);
   const [showAllGuide, setShowAllGuide] = useState(false);
-  const findArticles = ['roman-empire', 'blue-sky', 'web-accessibility', 'cold-war'].flatMap((id) => library.articles.filter((article) => article.id === id));
+  const findArticles = ['ronaldo', 'facebook', 'united-states', 'bible'].flatMap((id) => library.articles.filter((article) => article.id === id));
 
   return (
     <div className="pg-scroll h-full overflow-auto bg-[#fffaf6] dark:bg-night">
