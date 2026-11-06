@@ -49,6 +49,19 @@ test('hidden tracks and blocked artists cannot play, and both can be restored', 
   expect(state.soundPlaying).toBe(true);
 });
 
+test('hide Midnight Signals and block Nova Vale completes only when both preferences remain enabled', () => {
+  const task = 'Hide Midnight Signals and block Nova Vale';
+  const start = initialSandbox('soundcloud');
+  let state = click(start, 'preferences');
+  state = click(state, 'hide-track-midnight');
+  expect(verifySandboxTask(task, state, library, start).completed).toBe(false);
+  state = click(state, 'hide-artist-nova');
+  expect(verifySandboxTask(task, state, library, start).completed).toBe(true);
+  expect(() => click(state, 'play-midnight')).toThrow();
+  state = click(state, 'unhide-track-midnight');
+  expect(verifySandboxTask(task, state, library, start).completed).toBe(false);
+});
+
 test('Discord walkthrough requires a Jam, shared invite and simulated joining, not real integration', () => {
   const start = initialSandbox('soundcloud');
   let state = click(start, 'jam');
