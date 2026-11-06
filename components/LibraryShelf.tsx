@@ -22,9 +22,9 @@ const GUIDE_SITES: { id: SandboxSite; name: string; description: string }[] = [
 ];
 
 export const FIND_PROMPTS: Record<string, string[]> = {
-  'ronaldo': ['How did Ronaldo evolve from a winger into a goalscorer?', 'Which Champions League records does Ronaldo hold?', 'What major trophies has Ronaldo won with Portugal?'],
-  'facebook': ['How did Facebook expand beyond Harvard students?', 'What happened in the Cambridge Analytica scandal?', 'How does Facebook make money?'],
-  'united-states': ['How did the United States expand across North America?', 'How does the US government divide power among its branches?', 'Why does the United States have such diverse climates?'],
+  'ronaldo': ['How did Ronaldo evolve from a winger into a goalscorer?', 'Can you summarize the early life of Ronaldo?', 'What major trophies has Ronaldo won in his career?'],
+  'facebook': ['What is the early story of Facebook?', 'What happened in the Cambridge Analytica scandal?', 'How does Facebook make money?'],
+  'united-states': ['How did the United States expand across North America?', 'How do the US government’s checks and balances work?', 'Why does the United States have such diverse climates?'],
   'bible': ['Why do different Christian traditions have different numbers of biblical books?', 'Which languages were the biblical texts originally written in?', 'What do the Dead Sea Scrolls reveal about the history of the Bible?'],
 };
 
