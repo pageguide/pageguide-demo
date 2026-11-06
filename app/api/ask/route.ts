@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { PROVIDERS, resolveKey } from '@/lib/providers';
 import type { AskRequestBody, Block, Provider } from '@/lib/types';
 import { composeFindAnswer } from '@/lib/find-answer';
-import { selectFindPassages, validCitationQuote } from '@/lib/find-passages';
+import { selectFindPassages } from '@/lib/find-passages';
+import { resolveFindCitations } from '@/lib/find-citations';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -42,6 +43,7 @@ Write concise, separately supported claims. Citations must appear throughout the
 - Split different facts into separate claims. For example, a definition with marker 1, a history fact with marker 2, and an application with marker 3 become THREE claims, not one long paragraph followed by [1][2][3]. A single claim can use multiple markers only if they jointly support that same fact.
 - Do not add a separate sources/citations footer. The server assembles each claim and its markers inline in the order you provide.
 - Every citation "id" MUST be a text block id (heading/paragraph/listitem/quote) from the page.
+- Use a unique marker for each distinct quoted passage, even when two passages come from the same block.
 - "quote" MUST be an exact, verbatim substring of that block's text: the supporting passage, a complete sentence or clause that gives enough context (it may be on the longer side). Copy it character-for-character.
 - Each claim must be fully supported by its quoted passage. Do not add a more precise date, number, or detail than the passage provides. If it gives only a month and year, do not invent the day.
 - "emphasis" is OPTIONAL: when one specific phrase inside "quote" most directly supports the point, set "emphasis" to that exact phrase — a verbatim substring of "quote" — and it will be highlighted more strongly within the quote. Omit it when the whole quote is the point.
@@ -219,31 +221,8 @@ export async function POST(req: NextRequest) {
     if (!answer && mode !== 'find') return NextResponse.json({ error: 'The model returned no answer.' }, { status: 502 });
 
     if (mode === 'find') {
-      const textAllow = new Set(
-        blocks.filter((b) => ['heading', 'paragraph', 'listitem', 'quote'].includes(b.type)).map((b) => b.id),
-      );
       const imageById = new Map(blocks.filter((b) => b.type === 'image' && b.src).map((b) => [b.id, b]));
-
-      const textById = new Map(blocks.map((b) => [b.id, b.text]));
-      const norm = (s: string) => s.replace(/\s+/g, ' ').trim().toLowerCase();
-      const citations = (Array.isArray(parsed?.citations) ? parsed.citations : [])
-        .filter((c: any) => c && typeof c.id === 'string' && textAllow.has(c.id) && validCitationQuote(textById.get(c.id) || '', c.quote))
-        .slice(0, 8)
-        .map((c: any) => {
-          // keep the quote only if it's genuinely a substring of the block text
-          let quote: string | undefined;
-          let emphasis: string | undefined;
-          if (typeof c.quote === 'string' && c.quote.trim()) {
-            const blockText = textById.get(c.id) || '';
-            const qv = c.quote.trim();
-            if (norm(blockText).includes(norm(qv))) {
-              quote = qv;
-              // keep the inner emphasis only if it's a verbatim sub-span of the quote
-              if (typeof c.emphasis === 'string' && c.emphasis.trim() && norm(qv).includes(norm(c.emphasis))) emphasis = c.emphasis.trim();
-            }
-          }
-          return { marker: String(c.marker ?? ''), id: c.id, ...(quote ? { quote } : {}), ...(emphasis ? { emphasis } : {}) };
-        });
+      const citations = resolveFindCitations(parsed?.citations, blocks);
 
       let visual: {
         marker: string;
@@ -273,22 +252,22 @@ export async function POST(req: NextRequest) {
       }
       // Renumber citations to clean sequential markers (1, 2, 3…) regardless of the
       // labels the model used (it often reuses block ids like "n7"), so the UI shows [1], [2].
-      const markerMap = new Map<string, string>();
+      const markerMap = new Map<string, string[]>();
       const renumbered = citations.map((c: { marker: string; id: string; quote?: string }, i: number) => {
         const next = String(i + 1);
-        if (c.marker && !markerMap.has(c.marker)) markerMap.set(c.marker, next);
+        if (c.marker) markerMap.set(c.marker, [...(markerMap.get(c.marker) || []), next]);
         return { ...c, marker: next };
       });
-      const remap = (m: string) => markerMap.get(m) ?? (visual?.marker === m ? m : '__invalid_citation__');
+      const remap = (m: string): string[] => markerMap.get(m) ?? (visual?.marker === m ? [m] : ['__invalid_citation__']);
       const claims = Array.isArray(parsed?.claims)
-        ? parsed.claims.map((cl: any) => ({ ...cl, markers: Array.isArray(cl?.markers) ? cl.markers.map((m: any) => remap(String(m))) : cl?.markers }))
+        ? parsed.claims.map((cl: any) => ({ ...cl, markers: Array.isArray(cl?.markers) ? cl.markers.flatMap((m: any) => remap(String(m))) : cl?.markers }))
         : parsed?.claims;
 
       const allowed = new Set<string>([...renumbered.map((c: { marker: string }) => c.marker), ...(visual ? [visual.marker] : [])]);
       const fallbackMarkers = [...answer.matchAll(/\[([A-Za-z]{0,2}\d+)\]/g)];
-      const fallback = fallbackMarkers.some((match) => remap(match[1]) === '__invalid_citation__')
+      const fallback = fallbackMarkers.some((match) => remap(match[1]).includes('__invalid_citation__'))
         ? 'I couldn’t verify an answer in the provided page passages.'
-        : answer.replace(/\[([A-Za-z]{0,2}\d+)\]/g, (_: string, marker: string) => `[${remap(marker)}]`);
+        : answer.replace(/\[([A-Za-z]{0,2}\d+)\]/g, (_: string, marker: string) => remap(marker).map(value => `[${value}]`).join(' '));
       const inlineAnswer = composeFindAnswer(claims, fallback, allowed);
       if (!inlineAnswer) return NextResponse.json({ error: 'The model returned no answer.' }, { status: 502 });
       // Only keep evidence whose marker actually appears in the answer, so every on-page

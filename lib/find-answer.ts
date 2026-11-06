@@ -11,9 +11,9 @@ export function composeFindAnswer(claims: unknown, fallback: string, allowed: Se
     const text = claim.text.replace(/\[(?:[A-Za-z]{0,2})\d+\]/g, '').trim();
     const requested = Array.isArray(claim.markers) ? claim.markers : [];
     const markers = [...new Set<string>(requested.filter((m: unknown): m is string => typeof m === 'string' && allowed.has(m)))];
-    // An unverifiable factual claim must not survive as a confident, uncited answer.
-    if (requested.length && !markers.length) return [];
-    return [`${text}${markers.length ? ' ' + markers.map((m) => `[${m}]`).join(' ') : ''}`];
+    // Preserve the model's answer, but never present a failed source check as verified.
+    const unverified = requested.some((marker: unknown) => typeof marker !== 'string' || !allowed.has(marker));
+    return [`${text}${markers.length ? ' ' + markers.map((m) => `[${m}]`).join(' ') : ''}${unverified ? ' (Source not verified.)' : ''}`];
   });
   return parts.join(' ').slice(0, 4000) || 'I couldn’t verify an answer in the provided page passages.';
 }

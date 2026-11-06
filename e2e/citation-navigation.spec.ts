@@ -20,7 +20,7 @@ test('invented or misassigned quotes cannot become whole-block citations', () =>
   expect(validCitationQuote('The Cold War ended in 1991.', 'The Berlin Wall fell in 1989.')).toBe(false);
   expect(validCitationQuote('The wall fell in November 1989.', 'the wall fell in November 1989.')).toBe(true);
   expect(validCitationQuote('The Cold War ended in 1991.', undefined)).toBe(false);
-  expect(composeFindAnswer([{ text: 'An unsupported date.', markers: ['1'] }], '', new Set())).toContain('couldn’t verify');
+  expect(composeFindAnswer([{ text: 'An unsupported date.', markers: ['1'] }], '', new Set())).toBe('An unsupported date. (Source not verified.)');
   expect(composeFindAnswer(undefined, 'An unsupported date [1]', new Set())).toContain('couldn’t verify');
 });
 
