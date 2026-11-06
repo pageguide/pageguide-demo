@@ -4,6 +4,26 @@ import { QUORA_CONTENT } from './quora-translations';
 
 // English is the stable source language. IDs and reducer values never depend on translated labels.
 const UI: Record<string, [string, string, string]> = {
+  'Notifications': ['Notificaciones', 'Notifications', 'Thông báo'],
+  'Your content': ['Tu contenido', 'Votre contenu', 'Nội dung của bạn'],
+  'All Notifications': ['Todas las notificaciones', 'Toutes les notifications', 'Tất cả thông báo'],
+  'Comments and mentions': ['Comentarios y menciones', 'Commentaires et mentions', 'Bình luận và lượt nhắc'],
+  'Upvotes': ['Votos a favor', 'Votes positifs', 'Lượt bình chọn'],
+  'Spaces': ['Espacios', 'Espaces', 'Không gian'],
+  'Filters': ['Filtros', 'Filtres', 'Bộ lọc'],
+  'Notification filters': ['Filtros de notificaciones', 'Filtres de notifications', 'Bộ lọc thông báo'],
+  'Community navigation': ['Navegación de la comunidad', 'Navigation de la communauté', 'Điều hướng cộng đồng'],
+  'unread notifications': ['notificaciones sin leer', 'notifications non lues', 'thông báo chưa đọc'],
+  'Your spaces': ['Tus espacios', 'Vos espaces', 'Không gian của bạn'],
+  'Business Space': ['Espacio de negocios', 'Espace affaires', 'Không gian kinh doanh'],
+  'Open Business Space': ['Abrir el espacio de negocios', 'Ouvrir l’espace affaires', 'Mở không gian kinh doanh'],
+  'Ask a question in Business Space': ['Hacer una pregunta en el espacio de negocios', 'Poser une question dans l’espace affaires', 'Đặt câu hỏi trong không gian kinh doanh'],
+  'Posting to: Business Space': ['Publicar en: Espacio de negocios', 'Publication dans : Espace affaires', 'Đăng vào: Không gian kinh doanh'],
+  'Posting to: Public community': ['Publicar en: Comunidad pública', 'Publication dans : Communauté publique', 'Đăng vào: Cộng đồng công khai'],
+  'Post to Business Space instead': ['Publicar en el espacio de negocios', 'Publier dans l’espace affaires', 'Đăng vào không gian kinh doanh'],
+  'Switch to public community': ['Cambiar a la comunidad pública', 'Passer à la communauté publique', 'Chuyển sang cộng đồng công khai'],
+  'Mark all as read': ['Marcar todo como leído', 'Tout marquer comme lu', 'Đánh dấu tất cả đã đọc'],
+  'View activity': ['Ver actividad', 'Voir l’activité', 'Xem hoạt động'],
   'Home feed': ['Inicio', 'Accueil', 'Trang chủ'],
   'Quora navigation': ['Navegación de Quora', 'Navigation Quora', 'Điều hướng Quora'],
   'Settings': ['Configuración', 'Paramètres', 'Cài đặt'],
@@ -121,7 +141,7 @@ export function localizeQuoraPost(p: Post, language: string): Post {
 }
 export function canonicalQuoraTopic(value: string): string {
   const normalize = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-  return ['Gardening', 'Programming', 'Everyday life', 'Travel', 'Cooking', 'Design', 'Science'].find(topic => normalize(topic) === normalize(value) || (UI[topic] || []).some(v => normalize(v) === normalize(value))) || value;
+  return ['Gardening', 'Programming', 'Everyday life', 'Travel', 'Cooking', 'Design', 'Science', 'Business'].find(topic => normalize(topic) === normalize(value) || (UI[topic] || []).some(v => normalize(v) === normalize(value))) || value;
 }
 export function localizeQuoraBlock(b: Block, language: string, draftLanguage: string): Block {
   const t = (key: string, values?: Record<string, string | number>) => qt(language, key, values);
@@ -132,7 +152,7 @@ export function localizeQuoraBlock(b: Block, language: string, draftLanguage: st
     if (name) { const label = t(name).replace(/^./u, c => c.toLocaleUpperCase()); text = draftLanguage === name ? t('{language} (selected)', { language: label }) : label; }
   } else if (b.id === 'notice' && b.text.startsWith('Language saved: ')) text = t('Language saved: {language}.', { language: t(language) });
   else if (b.id === 'notice' && b.text.startsWith('Search results for “')) text = t('Search results for “{query}”.', { query: b.text.slice(20, -2) === 'all' ? t('all') : b.text.slice(20, -2) });
-  else if (b.id.startsWith('post-') && b.type === 'button') text = t('Read post: {title}', { title: b.text.slice(11) });
+  else if (b.id.startsWith('post-') && b.id !== 'post-question' && b.type === 'button') text = t('Read post: {title}', { title: b.text.slice(11) });
   else if (b.id.startsWith('topic-')) text = t('Browse {topic}', { topic: t(b.text.slice(7)) });
   else if (b.id.startsWith('follow-')) text = t(b.text.startsWith('Unfollow ') ? 'Unfollow {topic}' : 'Follow {topic}', { topic: t(b.text.replace(/^(Unfollow|Follow) /, '')) });
   else if (b.id.startsWith('author-')) text = b.text.split(' · ').map(part => /^\d+ answers$/.test(part) ? t('{count} answers', { count: part.split(' ')[0] }) : t(part)).join(' · ');

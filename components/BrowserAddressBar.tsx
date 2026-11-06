@@ -3,7 +3,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useStore } from '@/lib/store';
 
-/** Optional address/search UI. Enable with NEXT_PUBLIC_SHOW_ADDRESS_BAR=true. */
+/** Address/search UI shown in Admin mode or with NEXT_PUBLIC_SHOW_ADDRESS_BAR=true. */
 export default function BrowserAddressBar() {
   const { browserView, doc, query, loadUrl, search } = useStore();
   const location = browserView === 'empty' ? 'PageGuide library' : browserView === 'loading' ? query : browserView === 'results' ? `Search: ${query}` : doc?.url || 'PageGuide library';

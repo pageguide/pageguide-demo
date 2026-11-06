@@ -31,12 +31,15 @@ export default function SidePanel() {
     guideRun,
     scratchpad,
     pendingConfirm,
+    guide,
     resolveConfirm,
     uiMode,
     setUiMode,
     composerDraft,
     composerFocusRevision,
   } = useStore();
+  const inputTarget = guide?.steps[guide.current]?.id;
+  const userInputReady = (doc?.blocks.find(block => block.id === inputTarget)?.value || '').trim().length >= (inputTarget === 'question-title' ? 8 : 10);
   const [modeMenu, setModeMenu] = useState(false);
   const [modeInfo, setModeInfo] = useState(false);
   const [input, setInput] = useState('');
@@ -146,7 +149,7 @@ export default function SidePanel() {
                 : ' This action can’t be undone.'}
             </p>
             <div className="mt-3 flex gap-2">
-              <button disabled={guideRun?.paused} onClick={() => resolveConfirm(true)} className="disabled:cursor-not-allowed disabled:opacity-50 flex-1 rounded-xl bg-orange px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange">{pendingConfirm.mode === 'step' ? 'Do this step' : 'Approve'}</button>
+              <button disabled={guideRun?.paused || (pendingConfirm.kind === 'user-input' && !userInputReady)} onClick={() => resolveConfirm(true)} className="disabled:cursor-not-allowed disabled:opacity-50 flex-1 rounded-xl bg-orange px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange">{pendingConfirm.kind === 'user-input' ? 'Continue' : pendingConfirm.mode === 'step' ? 'Do this step' : 'Approve'}</button>
               <button onClick={() => resolveConfirm(false)} className="flex-1 rounded-xl border border-line px-4 py-2.5 text-sm font-semibold text-ink transition hover:bg-orange-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange dark:border-night-line dark:text-night-ink dark:hover:bg-white/5">{pendingConfirm.mode === 'step' ? 'Stop' : 'Deny'}</button>
             </div>
           </div>

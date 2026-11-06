@@ -6,7 +6,7 @@ export interface Article {
 export interface Product { id: string; name: string; emoji: string; price: number; description: string }
 export interface Comment { id: string; author: string; text: string }
 export interface Answer { id: string; author: string; credential: string; votes: number; text: string; comments: Comment[] }
-export interface Post { id: string; title: string; topic: string; author: string; body: string; answers?: Answer[] }
+export interface Post { id: string; title: string; topic: string; author: string; body: string; answers?: Answer[]; space?: string }
 export interface Library { version: number; articles: Article[]; products: Product[]; posts: Post[] }
 export const LOCAL_LIBRARY: Library = seed;
 export const LIBRARY_ORIGIN = 'https://library.pageguide.test';

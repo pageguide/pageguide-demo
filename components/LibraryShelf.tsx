@@ -8,16 +8,16 @@ import { sandboxUrl, type SandboxSite } from '@/lib/sandboxes';
 import { prefetchSavedPage } from '@/lib/saved-client';
 
 export const SANDBOX_TASKS: Record<SandboxSite, string[]> = {
-  amazon: ['Add oranges to my cart', 'Buy oranges using demo checkout', 'Save coffee to my wishlist'],
-  quora: ['Change my language to Spanish', 'Find and browse posts about gardening', 'Follow the Gardening topic', 'Publish a demo question about gardening'],
-  soundcloud: ['Play Midnight Signals', 'Like Midnight Signals', 'Follow Nova Vale'],
+  amazon: ['How do I return the jacket I bought on Amazon last week?', 'Buy oranges using demo checkout', 'Where can I track my order and see when it will arrive?'],
+  quora: ['Change language to Spanish', 'How to post a question to Business Space', 'How to check notifications for my content?'],
+  soundcloud: ['Change Spotify plan: upgrade to Premium', 'Hide and unhide songs & artists on Spotify', 'Listen to music on Spotify with friends on Discord'],
   'met-map': ['Open The Great Hall', 'Find the European Paintings galleries on Floor 2', 'Switch to Floor 2 and open Modern and Contemporary Art'],
 };
 
 const GUIDE_SITES: { id: SandboxSite; name: string; description: string }[] = [
   { id: 'amazon', name: 'Amazon', description: 'Shop, manage a cart, and check out.' },
   { id: 'quora', name: 'Quora', description: 'Browse questions, post replies, and follow topics.' },
-  { id: 'soundcloud', name: 'SoundCloud', description: 'Play previews, like tracks, and follow artists.' },
+  { id: 'soundcloud', name: 'Spotify', description: 'Explore Premium, listening preferences, and music with friends.' },
   { id: 'met-map', name: 'The Met Map', description: 'Explore galleries and switch museum floors.' },
 ];
 
