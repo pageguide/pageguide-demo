@@ -8,8 +8,8 @@ import { evidenceForAnswer } from '@/lib/evidence';
 
 const MODES = [
   { id: 'find', label: 'Find', desc: 'Answer a question about this page, with the sources highlighted. Read-only — takes no actions.' },
-  { id: 'auto', label: 'Auto', desc: 'Let the agent complete a task on this page automatically, performing each step itself.' },
   { id: 'manual', label: 'Manual', desc: 'Follow the on-page arrow and click each highlighted control to advance one step at a time.' },
+  { id: 'auto', label: 'Auto', desc: 'Let the agent complete a task on this page automatically, performing each step itself.' },
 ] as const;
 
 export default function SidePanel() {
