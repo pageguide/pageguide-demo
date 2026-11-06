@@ -22,17 +22,17 @@ const GUIDE_SITES: { id: SandboxSite; name: string; description: string }[] = [
 ];
 
 export const FIND_PROMPTS: Record<string, string[]> = {
-  'roman-empire': ['When did the Roman Empire begin?', 'Which emperor divided the empire?'],
-  'blue-sky': ['What is Rayleigh scattering?', 'Why does the sky appear blue?'],
-  'web-accessibility': ['Why is web accessibility important?', 'Who benefits from accessible web design?'],
-  'cold-war': ['When did the Cold War begin?', 'What events led to its end?'],
+  'ronaldo': ['How did Ronaldo evolve from a winger into a goalscorer?', 'Can you summarize the early life of Ronaldo?', 'What major trophies has Ronaldo won in his career?'],
+  'facebook': ['What is the early story of Facebook?', 'What happened in the Cambridge Analytica scandal?', 'How does Facebook make money?'],
+  'united-states': ['How did the United States expand across North America?', 'How do the US government’s checks and balances work?', 'Why does the United States have such diverse climates?'],
+  'bible': ['Why do different Christian traditions have different numbers of biblical books?', 'Which languages were the biblical texts originally written in?', 'What do the Dead Sea Scrolls reveal about the history of the Bible?'],
 };
 
 export default function LibraryShelf() {
   const { library, pageError, loadUrl, uiMode, setUiMode } = useStore();
   const [showAllFind, setShowAllFind] = useState(false);
   const [showAllGuide, setShowAllGuide] = useState(false);
-  const findArticles = ['roman-empire', 'blue-sky', 'web-accessibility', 'cold-war'].flatMap((id) => library.articles.filter((article) => article.id === id));
+  const findArticles = ['ronaldo', 'facebook', 'united-states', 'bible'].flatMap((id) => library.articles.filter((article) => article.id === id));
 
   return (
     <div className="pg-scroll h-full overflow-auto bg-[#fffaf6] dark:bg-night">
@@ -63,8 +63,8 @@ export default function LibraryShelf() {
             <div className="mt-1">
               <p className="text-base font-medium leading-snug text-ink dark:text-night-ink">The agent navigates the website and completes your goal.</p>
               <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm leading-relaxed text-muted dark:text-night-muted">
-                <div><dt className="inline font-semibold text-ink dark:text-night-ink">Auto</dt>{' · '}<dd className="inline">Agent runs the steps</dd></div>
                 <div><dt className="inline font-semibold text-ink dark:text-night-ink">Manual</dt>{' · '}<dd className="inline">You approve each step</dd></div>
+                <div><dt className="inline font-semibold text-ink dark:text-night-ink">Auto</dt>{' · '}<dd className="inline">Agent runs the steps</dd></div>
               </dl>
             </div>
             <ExampleMedia mode="Guide" query={'Find the nearest cafe to the American Wing\nOn the first floor of the MET Museum'} type="video" src="/demo-media/guide-latest.mp4?v=latest-256058da" gifSrc="/demo-media/guide-latest.gif?v=latest-256058da-15x" gifSeekSrc="/demo-media/guide-gif-seekable.mp4?v=latest-256058da-15x" gifPlaybackRate={1.5} poster="/examples/guide-demo-poster.jpg" captionsSrc="/examples/guide-demo.en.vtt" alt="Guide demonstration video" width={1440} height={1080} />
@@ -72,7 +72,7 @@ export default function LibraryShelf() {
             <div>
               <div className="grid auto-rows-fr gap-2 sm:grid-cols-2">
                 {(showAllGuide ? GUIDE_SITES : GUIDE_SITES.slice(0, 2)).map((site) => (
-                  <button key={site.id} onClick={() => { if (uiMode === 'find') setUiMode('auto'); void loadUrl(sandboxUrl(site.id)); }} className="library-card library-card--compact text-left">
+                  <button key={site.id} onClick={() => { if (uiMode === 'find') setUiMode('manual'); void loadUrl(sandboxUrl(site.id)); }} className="library-card library-card--compact text-left">
                     <span className="block text-sm font-semibold leading-snug">{site.name}</span>
                     <span className="mt-1 block truncate text-xs leading-snug text-muted dark:text-night-muted" title={site.description}>{site.description}</span>
                     <span className="mt-2 block text-xs font-medium text-orange">Open →</span>

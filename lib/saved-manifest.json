@@ -1,32 +1,22 @@
 {
-  "fetch-api": {
-    "version": "ca26e7a4a3f13a51",
-    "sourceFile": "save-webpage/Fetch API - Web APIs ｜ MDN (11_3_2026 2：26：04 PM).html",
-    "bytes": 311410
+  "ronaldo": {
+    "version": "45c77e1a8bba8f08",
+    "sourceFile": "save-webpage/Cristiano Ronaldo - Wikipedia (11_6_2026 12：54：39 PM).html",
+    "bytes": 1247443
   },
-  "blue-sky": {
-    "version": "0326aeae743c1ddb",
-    "sourceFile": "save-webpage/Rayleigh scattering - Wikipedia (11_3_2026 2：26：28 PM).html",
-    "bytes": 415037
+  "facebook": {
+    "version": "6be7124b7d962bb6",
+    "sourceFile": "save-webpage/Facebook - Wikipedia (11_6_2026 12：54：36 PM).html",
+    "bytes": 730897
   },
-  "web-accessibility": {
-    "version": "3ae9008a3950bc0f",
-    "sourceFile": "save-webpage/Introduction to Web Accessibility ｜ Web Accessibility Initiative (WAI) ｜ W3C (11_3_2026 2：26：40 PM).html",
-    "bytes": 214620
+  "united-states": {
+    "version": "2e41d78f40acb386",
+    "sourceFile": "save-webpage/United States - Wikipedia (11_6_2026 12：54：35 PM).html",
+    "bytes": 1930845
   },
-  "cold-war": {
-    "version": "3a63cfb2901484bb",
-    "sourceFile": "save-webpage/Cold War - Wikipedia (11_3_2026 11：37：00 AM).html",
-    "bytes": 2208906
-  },
-  "manhattan": {
-    "version": "08f6fd1875d34970",
-    "sourceFile": "save-webpage/Manhattan - Wikipedia (11_3_2026 11：36：47 AM).html",
-    "bytes": 2357715
-  },
-  "roman-empire": {
-    "version": "be6cee0c8f8cddb2",
-    "sourceFile": "save-webpage/Roman Empire - Wikipedia (11_3_2026 11：36：36 AM).html",
-    "bytes": 3404803
+  "bible": {
+    "version": "35dd1fd9a83e26b7",
+    "sourceFile": "save-webpage/Bible - Wikipedia (11_6_2026 12：54：18 PM).html",
+    "bytes": 1566501
   }
 }

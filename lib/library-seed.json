@@ -1,12 +1,10 @@
 {
   "version": 1,
   "articles": [
-    { "id": "fetch-api", "title": "Fetch API", "site": "MDN Web Docs", "source": "https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API", "description": "The real MDN reference page, with its original HTML and layout." },
-    { "id": "blue-sky", "title": "Rayleigh scattering", "site": "Wikipedia", "source": "https://en.wikipedia.org/wiki/Rayleigh_scattering", "description": "The real Wikipedia article about light scattering and blue skies." },
-    { "id": "web-accessibility", "title": "Introduction to Web Accessibility", "site": "W3C WAI", "source": "https://www.w3.org/WAI/fundamentals/accessibility-intro/", "description": "The original W3C introduction, with its styles saved locally." },
-    { "id": "cold-war", "title": "Cold War", "site": "Wikipedia", "source": "https://en.wikipedia.org/wiki/Cold_War", "description": "Original saved Wikipedia page about the Cold War." },
-    { "id": "manhattan", "title": "Manhattan", "site": "Wikipedia", "source": "https://en.wikipedia.org/wiki/Manhattan", "description": "Original saved Wikipedia page about Manhattan, New York City." },
-    { "id": "roman-empire", "title": "Roman Empire", "site": "Wikipedia", "source": "https://en.wikipedia.org/wiki/Roman_Empire", "description": "Original saved Wikipedia page about the Roman Empire." }
+    { "id": "ronaldo", "title": "Cristiano Ronaldo", "site": "Wikipedia", "source": "https://en.wikipedia.org/wiki/Cristiano_Ronaldo", "description": "Explore Ronaldo's career, records, and evolution as a footballer." },
+    { "id": "facebook", "title": "Facebook", "site": "Wikipedia", "source": "https://en.wikipedia.org/wiki/Facebook", "description": "Discover how Facebook grew from a campus network into a global platform." },
+    { "id": "united-states", "title": "United States", "site": "Wikipedia", "source": "https://en.wikipedia.org/wiki/United_States", "description": "Explore the country's history, geography, and system of government." },
+    { "id": "bible", "title": "Bible", "site": "Wikipedia", "source": "https://en.wikipedia.org/wiki/Bible", "description": "Discover the Bible's languages, history, and different collections of books." }
   ],
   "products": [
     { "id": "oranges", "name": "Fresh oranges", "emoji": "🍊", "price": 4.99, "description": "A bag of six sweet, juicy oranges. In stock. Ships from the demo market." },
