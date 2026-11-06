@@ -10,7 +10,7 @@ import { prefetchSavedPage } from '@/lib/saved-client';
 export const SANDBOX_TASKS: Record<SandboxSite, string[]> = {
   amazon: ['How do I return the jacket I bought on Amazon last week?', 'Buy oranges using demo checkout', 'Where can I track my order and see when it will arrive?'],
   quora: ['Change language to Spanish', 'How to post a question to Business Space', 'How to check notifications for my content?'],
-  soundcloud: ['Change Spotify plan: upgrade to Premium', 'Hide and unhide songs & artists on Spotify', 'Listen to music on Spotify with friends on Discord'],
+  soundcloud: ['Change Spotify plan: upgrade to Premium', 'Hide Midnight Signals and block Nova Vale', 'Listen to music on Spotify with friends on Discord'],
   'met-map': ['Open The Great Hall', 'Find the European Paintings galleries on Floor 2', 'Switch to Floor 2 and open Modern and Contemporary Art'],
 };
 

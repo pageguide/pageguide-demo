@@ -523,7 +523,9 @@ export function verifySandboxTask(task: string, s: SandboxState, lib: Library, i
     if (/\b(save|bookmark)\b.{0,20}\bpost\b/i.test(task)) checks.push({ passed: Boolean(s.selected && s.bookmarks.includes(s.selected)), result: 'The opened post is saved.', missing: 'The opened post has not been saved.' });
   } else if (s.site === 'soundcloud') {
     if (/\b(upgrade|premium)\b/i.test(task)) checks.push({ passed: s.spotifyPlan === 'Premium', result: 'The demo account is now on Spotify Premium. No real subscription or charge.', missing: 'Select Premium, review the demo plan, and confirm the upgrade.' });
-    if (/\b(hide|unhide)\b/i.test(task)) {
+    if (/hide midnight signals/i.test(task) && /block nova vale/i.test(task) && !/\b(unhide|unblock)\b/i.test(task)) {
+      checks.push({ passed: Boolean(s.hiddenTracks?.includes('midnight') && s.hiddenArtists?.includes('nova')), result: 'Midnight Signals is hidden and Nova Vale is blocked in Content preferences.', missing: 'Hide Midnight Signals and block Nova Vale. Leave both preferences enabled.' });
+    } else if (/\b(hide|unhide)\b/i.test(task)) {
       const changes = (s.visibilityHistory || []).slice(initial?.visibilityHistory?.length || 0);
       const restored = (kind: string) => changes.some(change => change.startsWith(`hide-${kind}-`) && changes.slice(changes.indexOf(change) + 1).includes(`un${change}`));
       checks.push({ passed: restored('track') && restored('artist'), result: 'A song and an artist were hidden and restored in Content preferences.', missing: 'Use Content preferences to hide and then unhide both a song and an artist.' });
