@@ -17,7 +17,13 @@ export default function GuidePointer() {
   const resolveConfirm = useStore(s => s.resolveConfirm);
   const [layout, setLayout] = useState<PointerLayout | null>(null);
   const markerId = `guide-arrow-${useId().replace(/:/g, '')}`;
-  const active = manual && running && !!pending && !!targetId;
+  const userInput = pending?.kind === 'user-input';
+  const userInputReady = useStore(state => {
+    const id = state.guide?.steps[state.guide.current]?.id;
+    const value = state.doc?.blocks.find(block => block.id === id)?.value || '';
+    return value.trim().length >= (id === 'question-title' ? 8 : 10);
+  });
+  const active = (manual || userInput) && running && !!pending && !!targetId;
 
   useEffect(() => {
     setLayout(null);
@@ -31,6 +37,7 @@ export default function GuidePointer() {
     let reveal = true;
     const approveTarget = (event: Event) => {
       const state = useStore.getState();
+      if (state.pendingConfirm?.kind === 'user-input') return; // Let people focus, select, and type without approving the step.
       if (state.uiMode !== 'manual' || !state.pendingConfirm || state.guide?.steps[state.guide.current]?.id !== targetId) return;
       if (target && event.target && target.contains(event.target as Node)) {
         // Approve the queued action, never also dispatch the native action. This keeps
@@ -120,10 +127,10 @@ export default function GuidePointer() {
       <path d={layout.path} fill="none" stroke="white" strokeWidth="12" strokeLinecap="round" />
       <path data-testid="manual-guide-arrow" data-tip-x={layout.tipX} data-tip-y={layout.tipY} d={layout.path} fill="none" stroke="#e96d2c" strokeWidth="7" strokeLinecap="round" markerEnd={`url(#${markerId})`} />
     </svg>
-    <button type="button" aria-label="Perform highlighted step" onClick={() => resolveConfirm(true)} className="pointer-events-auto fixed flex flex-col justify-center rounded-2xl border-2 border-white bg-[#e96d2c] px-3 py-2 text-left text-white shadow-lg focus-visible:outline focus-visible:outline-4 focus-visible:outline-orange" style={{ left: layout.left, top: layout.top, width: layout.width, height: layout.height }}>
+    <button type="button" aria-label={userInput ? 'Continue after typing' : 'Perform highlighted step'} disabled={userInput && !userInputReady} onClick={() => resolveConfirm(true)} className="pointer-events-auto fixed flex flex-col justify-center rounded-2xl border-2 border-white bg-[#e96d2c] px-3 py-2 text-left text-white shadow-lg focus-visible:outline focus-visible:outline-4 focus-visible:outline-orange" style={{ left: layout.left, top: layout.top, width: layout.width, height: layout.height }}>
       <span className="text-[9px] font-bold uppercase tracking-wider opacity-80">Your next step</span>
       <span className="line-clamp-2 text-sm font-semibold leading-tight">{pending?.instruction}</span>
-      <span className="mt-1 text-[10px] leading-tight">Click here or the highlighted control</span>
+      <span className="mt-1 text-[10px] leading-tight">{userInput ? 'Type your own text, then click Continue' : 'Click here or the highlighted control'}</span>
     </button>
   </div>, document.body);
 }

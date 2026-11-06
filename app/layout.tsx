@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import './sandboxes.css';
+import './spotify.css';
 
 export const metadata: Metadata = {
   title: 'PageGuide — Find & Guide on any page',

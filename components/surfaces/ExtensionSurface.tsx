@@ -14,6 +14,7 @@ import type { Block } from '@/lib/types';
 export default function ExtensionSurface() {
   const {
     browserView,
+    admin,
     doc,
     results,
     query,
@@ -75,7 +76,7 @@ export default function ExtensionSurface() {
               ›
             </button>
           </div>
-          {process.env.NEXT_PUBLIC_SHOW_ADDRESS_BAR === 'true' ? <BrowserAddressBar /> : (
+          {admin || process.env.NEXT_PUBLIC_SHOW_ADDRESS_BAR === 'true' ? <BrowserAddressBar /> : (
             <div data-testid="browser-location" className="min-w-0 flex-1 truncate px-3 py-2 text-sm text-muted dark:text-night-muted">
               {browserView === 'empty' ? 'PageGuide library' : browserView === 'loading' ? 'Loading…' : browserView === 'results' ? `Search: ${query}` : doc?.title || 'PageGuide'}
             </div>

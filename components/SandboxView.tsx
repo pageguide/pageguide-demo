@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useStore } from '@/lib/store';
 import type { Block, PageDoc } from '@/lib/types';
 import { readPageSelection } from '@/lib/page-selection';
-import SoundCloudSandbox from './SoundCloudSandbox';
+import SpotifySandbox from './SpotifySandbox';
 import MetMapSandbox from './MetMapSandbox';
 import AmazonSandbox from './AmazonSandbox';
 import { qt, quoraLocale } from '@/lib/quora-i18n';
@@ -19,7 +19,8 @@ export default function SandboxView({ doc }: { doc: PageDoc }) {
   const running = useStore((s) => s.guideRun?.running);
   const pending = useStore((s) => s.pendingConfirm);
   const resolveConfirm = useStore((s) => s.resolveConfirm);
-  const quoraLanguage = useStore((s) => s.sandboxSessions.quora?.language || 'English');
+  const quoraState = useStore((s) => s.sandboxSessions.quora);
+  const quoraLanguage = quoraState?.language || 'English';
   const root = useRef<HTMLDivElement>(null);
   const guideId = guide?.steps[guide.current]?.id;
   useEffect(() => {
@@ -38,7 +39,7 @@ export default function SandboxView({ doc }: { doc: PageDoc }) {
       // In manual mode, the highlighted step control is clickable to approve/advance the step.
       const awaiting = !!pending && guideId === b.id;
       return (
-        <button {...attrs} disabled={running && !awaiting} aria-pressed={b.id.startsWith('language-') ? b.text.includes('(') : undefined}
+        <button {...attrs} disabled={running && !awaiting} aria-pressed={b.id.startsWith('language-') ? b.text.includes('(') : b.id.startsWith('notifications-filter-') ? (quoraState?.notificationFilter || 'all') === b.id.slice(21) : undefined}
           onClick={() => awaiting ? resolveConfirm(true) : act({ type: 'click', id: b.id })}
           className={`${attrs.className} sandbox-button ${b.id.startsWith('add-') || ['save-language', 'checkout', 'review-order', 'pay-demo', 'post-question', 'submit-answer'].includes(b.id) ? 'sandbox-primary' : ''}`}>
           {b.text}{marker}
@@ -50,10 +51,10 @@ export default function SandboxView({ doc }: { doc: PageDoc }) {
       return <label key={b.id} className={b.id === 'search' ? 'min-w-[160px] flex-1' : 'my-2 block w-full'}>
         {b.id !== 'search' && <span className="mb-1 block text-sm font-medium text-[#555]">{b.text}</span>}
         {b.multiline ? <textarea {...attrs} aria-label={b.text} rows={4} placeholder={b.text} value={b.value || ''} disabled={running && !(pending && guideId === b.id)}
-          onClick={() => { if (pending && guideId === b.id) resolveConfirm(true); }}
+          onClick={() => { if (pending && pending.kind !== 'user-input' && guideId === b.id) resolveConfirm(true); }}
           onChange={(e) => act({ type: 'fill', id: b.id, value: e.target.value })} className={style} />
           : <input {...attrs} type={b.id === 'search' ? 'search' : 'text'} aria-label={b.text} placeholder={b.text} value={b.value || ''} disabled={running && !(pending && guideId === b.id)}
-            onClick={() => { if (pending && guideId === b.id) resolveConfirm(true); }}
+            onClick={() => { if (pending && pending.kind !== 'user-input' && guideId === b.id) resolveConfirm(true); }}
             onChange={(e) => act({ type: 'fill', id: b.id, value: e.target.value })}
             onKeyDown={(e) => { if (e.key === 'Enter' && b.id === 'search') act({ type: 'click', id: 'search-submit' }); }} className={style} />}
       </label>;
@@ -73,7 +74,7 @@ export default function SandboxView({ doc }: { doc: PageDoc }) {
     return <div ref={root} data-sandbox-root className={`pg-scroll h-full ${doc.sandbox === 'met-map' ? 'overflow-hidden' : 'overflow-auto'} sandbox-page`}
       onMouseUp={() => { const selected = root.current && readPageSelection(root.current, doc.url); if (selected) setSelection(selected); }}
       onKeyUp={() => { const selected = root.current && readPageSelection(root.current, doc.url); if (selected) setSelection(selected); }}>
-      {doc.sandbox === 'soundcloud' ? <SoundCloudSandbox doc={doc} /> : doc.sandbox === 'met-map' ? <MetMapSandbox doc={doc} /> : <AmazonSandbox doc={doc} render={render} />}
+      {doc.sandbox === 'soundcloud' ? <SpotifySandbox doc={doc} render={render} /> : doc.sandbox === 'met-map' ? <MetMapSandbox doc={doc} /> : <AmazonSandbox doc={doc} render={render} />}
     </div>;
   }
 
@@ -81,18 +82,24 @@ export default function SandboxView({ doc }: { doc: PageDoc }) {
     const search = navigation.find((b) => b.id === 'search');
     const searchSubmit = navigation.find((b) => b.id === 'search-submit');
     const postGroups = groups.filter((group) => group.startsWith('post-'));
-    const otherGroups = groups.filter((group) => !group.startsWith('post-') && group !== 'topics');
+    const otherGroups = groups.filter((group) => !group.startsWith('post-') && group !== 'topics' && group !== 'notification-filters');
     const topics = doc.blocks.filter((b) => b.group === 'topics');
     const quoraHome = new URL(doc.url).pathname === '/';
     const quoraSettings = new URL(doc.url).pathname === '/settings';
+    const quoraNotifications = new URL(doc.url).pathname === '/notifications';
+    const unreadCount = quoraState?.notifications?.filter(item => !item.read).length || 0;
     const t = (key: string) => qt(quoraLanguage, key);
     return (
       <div className="pg-scroll h-full overflow-auto bg-[#f1f2f2]">
-        <div ref={root} data-sandbox-root onMouseUp={() => { const selected = root.current && readPageSelection(root.current, doc.url); if (selected) setSelection(selected); }} onKeyUp={() => { const selected = root.current && readPageSelection(root.current, doc.url); if (selected) setSelection(selected); }} lang={quoraLocale(quoraLanguage)} className="sandbox-page sandbox-quora min-h-full bg-[#f1f2f2] text-[#262626]">
+        <div ref={root} data-sandbox-root onMouseUp={() => { const selected = root.current && readPageSelection(root.current, doc.url); if (selected) setSelection(selected); }} onKeyUp={() => { const selected = root.current && readPageSelection(root.current, doc.url); if (selected) setSelection(selected); }} lang={quoraLocale(quoraLanguage)} className={`sandbox-page sandbox-quora min-h-full bg-[#f1f2f2] text-[#262626] ${quoraNotifications ? 'quora-notifications' : ''}`}>
           <header className="quora-header">
             <div className="quora-header-inner">
               <strong className="quora-logo">Quora</strong>
               <nav aria-label={t('Quora navigation')} className="quora-icons"><button type="button" data-node-id="home" aria-label={t('Home feed')} className={`${quoraHome ? 'active' : ''} ${guideId === 'home' ? 'pg-guide' : ''}`} disabled={running && !(pending && guideId === 'home')} onClick={() => act({ type: 'click', id: 'home' })}>⌂</button><span>▤</span><span>✎</span><span>♙</span><span>♧</span></nav>
+              <div className="quora-shortcuts" aria-label={t('Community navigation')}>
+                {navigation.filter(b => ['spaces', 'notifications'].includes(b.id)).map(render)}
+                {unreadCount > 0 && <span className="quora-unread-count" aria-label={`${unreadCount} ${t('unread notifications')}`}>{unreadCount}</span>}
+              </div>
               <div className="quora-search">{search && render(search)}{searchSubmit && render(searchSubmit)}</div>
               <span className="quora-plus">{t('Try Quora+')}</span>
               <span className="quora-profile">🍊</span><span className="quora-globe">◎</span>
@@ -100,10 +107,13 @@ export default function SandboxView({ doc }: { doc: PageDoc }) {
             </div>
           </header>
           <main className="quora-layout">
-            <aside className="quora-left">
+            <aside className="quora-left" aria-label={quoraNotifications ? t('Notification filters') : t('Spaces')}>
+              {quoraNotifications ? <><h2>{t('Filters')}</h2>{doc.blocks.filter(b => b.group === 'notification-filters').map(render)}</> : <>
               <button className="quora-create" type="button" onClick={() => act({ type: 'click', id: 'ask-question' })}>＋ {t('Ask a question')}</button>
-              {['Business', 'Movies', 'Technology', 'History', 'Spanish (language)', "PageGuide's Space", 'Cooking'].map((topic, index) => <div className="quora-rail-item" key={topic}><span>{['▦', '▣', '◼', '▤', '🇪🇸', '♧', '🥘'][index]}</span>{t(topic)}</div>)}
+              <button type="button" data-node-id="space-business" className={`quora-rail-item quora-space-link ${guideId === 'space-business' ? 'pg-guide' : focused === 'space-business' ? 'pg-visual' : ''}`} aria-label={t('Open Business Space')} aria-current={new URL(doc.url).pathname === '/space/Business' ? 'page' : undefined} disabled={running && !(pending && guideId === 'space-business')} onClick={() => pending && guideId === 'space-business' ? resolveConfirm(true) : act({ type: 'click', id: 'space-business' })}><span aria-hidden="true">▦</span>{t('Business')}{evidence.find(item => item.id === 'space-business')?.marker && <sup>{evidence.find(item => item.id === 'space-business')?.marker}</sup>}</button>
+              {['Movies', 'Technology', 'History', 'Spanish (language)', "PageGuide's Space", 'Cooking'].map((topic, index) => <div className="quora-rail-item" key={topic}><span>{['▦', '▣', '◼', '▤', '🇪🇸', '♧', '🥘'][index]}</span>{t(topic)}</div>)}
               <div className="quora-footer">{['About Quora', 'Terms', 'Privacy', 'Acceptable Use', 'Careers'].map(key => <div key={key}>{t(key)}</div>)}</div>
+              </>}
             </aside>
             <section className="quora-feed">
               <p className="sr-only">{sandboxLabel?.text}</p>
@@ -117,10 +127,10 @@ export default function SandboxView({ doc }: { doc: PageDoc }) {
               {otherGroups.filter(group => !(quoraSettings && group === 'languages')).map((group) => <section key={group} className="quora-panel">{doc.blocks.filter((b) => b.group === group).map(render)}</section>)}
               {doc.blocks.find((b) => b.id === 'empty') && <div className="quora-empty">{render(doc.blocks.find((b) => b.id === 'empty')!)}</div>}
             </section>
-            <aside className="quora-right">
+            {!quoraNotifications && <aside className="quora-right">
               <div className="quora-ad">{t('Advertisement')}</div>
               {topics.length > 0 && <section className="quora-topic-panel"><strong>{t('Discover spaces')}</strong>{topics.map(render)}</section>}
-            </aside>
+            </aside>}
           </main>
         </div>
       </div>

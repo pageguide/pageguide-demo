@@ -722,7 +722,15 @@ export const useStore = create<StoreState>((set, get) => ({
     set({ messages: [...get().messages, { id: msgId++, role: 'assistant', mode: 'guide', text: answer, guide: { run: finalRun, scratchpad: get().scratchpad } }],
       guideRun: null, scratchpad: [], guide: null, pendingConfirm: null, busy: false });
   },
-  resolveConfirm: (ok) => { confirmResolver?.(ok); },
+  resolveConfirm: (ok) => {
+    if (ok && get().pendingConfirm?.kind === 'user-input') {
+      const id = get().guide?.steps[get().guide!.current]?.id;
+      const draft = get().sandboxSessions.quora?.questionDraft;
+      const value = id === 'question-title' ? draft?.title : draft?.body;
+      if (!value || value.trim().length < (id === 'question-title' ? 8 : 10)) return;
+    }
+    confirmResolver?.(ok);
+  },
   setUiMode: (m) => set({ uiMode: m }),
   setComposerDraft: (text) => set({ composerDraft: text }),
   stageExampleRequest: (text, mode) => {
@@ -912,7 +920,8 @@ async function runAgent(
       const sandboxState = site ? get().sandboxSessions[site] : null;
       const satisfied = proposed.type !== 'finish' && history.some((h) => h.action === key) && !!sandboxState && verifySandboxTask(task, sandboxState, get().library, initialState).completed;
       const action: BrowserAction = satisfied ? { type: 'finish' } : proposed;
-      const instruction = satisfied ? 'Finish: the requested outcome is already in place.' : proposedInstruction;
+      const userInput = site === 'quora' && action.type === 'fill' && ['question-title', 'question-body'].includes(action.id || '');
+      const instruction = userInput ? `Enter your own ${action.id === 'question-title' ? 'question title' : 'question details'}, then click Continue.` : satisfied ? 'Finish: the requested outcome is already in place.' : proposedInstruction;
       // Sandbox state is the source of truth: a premature finish goes back to the agent with what is missing.
       if (action.type === 'finish' && site && corrections < MAX_AGENT_CORRECTIONS) {
         const current = get().sandboxSessions[site];
@@ -926,9 +935,11 @@ async function runAgent(
       // Manual mode: pause on every executable step. Auto mode: pause only for irreversible actions.
       const risk = site ? actionRisk(action) : null;
       const manual = get().uiMode === 'manual' && action.type !== 'finish';
-      if (risk || manual) {
+      if (risk || manual || userInput) {
         set({ guide: action.id ? { steps: [{ id: action.id, instruction }], current: 0 } : null }); // Never point to a stale target on URL-only navigation.
-        const prompt: NonNullable<StoreState['pendingConfirm']> = risk
+        const prompt: NonNullable<StoreState['pendingConfirm']> = userInput
+          ? { mode: 'step', kind: 'user-input', label: 'your text', title: 'Your turn to type', detail: `Type at least ${action.id === 'question-title' ? '8' : '10'} characters in the highlighted field. The agent will not write this for you.`, instruction }
+          : risk
           ? { mode: 'risk', kind: risk.kind, label: risk.label, title: risk.title, detail: risk.detail, instruction }
           : { mode: 'step', kind: 'step', label: 'step', title: 'Next step', detail: describeStep(action), instruction };
         const approved = await requestConfirm(set, prompt, signal);
@@ -938,6 +949,10 @@ async function runAgent(
           stopReason = risk ? `You declined the ${risk.label} step: “${instruction}”.` : `You stopped the run at: “${instruction}”.`;
           break;
         }
+      }
+      if (userInput) {
+        const draft = get().sandboxSessions.quora!.questionDraft;
+        action.value = action.id === 'question-title' ? draft.title : draft.body;
       }
       const run = get().guideRun!;
       const idx = run.journey.length;

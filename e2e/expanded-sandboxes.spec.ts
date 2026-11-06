@@ -61,7 +61,7 @@ test('checkout verification distinguishes reviewing from paying and rejects dupl
   state = applySandboxAction(state, { type: 'click', id: 'pay-demo' }, library).state;
   expect(verifySandboxTask('Buy oranges using demo checkout', state, library, start).completed).toBe(true);
   expect(() => applySandboxAction(state, { type: 'click', id: 'pay-demo' }, library)).toThrow();
-  expect(state.orders).toHaveLength(1);
+  expect(state.orders).toHaveLength(start.orders.length + 1);
 });
 
 test('Quora includes multiple answers/comments and supports posting, voting, saving and following', async ({ page }) => {
