@@ -41,6 +41,7 @@ Write concise, separately supported claims. Citations must appear throughout the
  "citations": [{"marker": "1", "id": "<block supporting the first claim>", "quote": "<exact supporting passage>", "emphasis": "<optional key phrase within quote>"}, {"marker": "2", "id": "<block supporting the next claim>", "quote": "<exact supporting passage>"}],
  "visual": {"marker": "V1", "id": "<image block id>", "box": [x, y, w, h], "caption": "<what the box shows>"} }
 - Split different facts into separate claims. For example, a definition with marker 1, a history fact with marker 2, and an application with marker 3 become THREE claims, not one long paragraph followed by [1][2][3]. A single claim can use multiple markers only if they jointly support that same fact.
+- Prefer 5–7 distinct, relevant supporting passages for each substantive answer when the page provides enough evidence. Spread their citations across the claims they support. Use fewer for narrow questions or limited evidence; never invent, duplicate, or add irrelevant passages just to reach a count. Multiple passages may come from the same page, but repeating a marker is not a new reference.
 - Do not add a separate sources/citations footer. The server assembles each claim and its markers inline in the order you provide.
 - Every citation "id" MUST be a text block id (heading/paragraph/listitem/quote) from the page.
 - Use a unique marker for each distinct quoted passage, even when two passages come from the same block.
@@ -50,7 +51,7 @@ Write concise, separately supported claims. Citations must appear throughout the
 - Use "visual" ONLY when one of the provided IMAGE blocks supports the answer: "id" is that image's block id and "box" is the region of THAT image supporting the answer as normalized [x, y, width, height], each 0..1 from the image's top-left corner. Otherwise set "visual" to null.
 - If the user's message is a greeting, small talk, or NOT a question about this page (e.g. "hi", "hello", "thanks"), do NOT answer from the page: return one short claim inviting them to ask about the page, with "markers": [], "citations": [], and "visual": null. Never fabricate an answer or a citation.
 - If the page does not contain the answer, say so plainly and return empty "citations". Never invent facts or citations.
-- Keep the combined claims under 90 words, plain text. If no factual answer is supported, return one short claim with an empty markers array.
+- Keep the combined claims under 180 words, plain text. Prefer focused claims rather than combining several facts whose sources support only part of the sentence. If no factual answer is supported, return one short claim with an empty markers array.
 
 If mode is "guide":
 You are an autonomous web agent: observe the page state and emit a plan of actions the browser will perform for the user.
@@ -143,7 +144,7 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify({
           model,
           temperature: 0,
-          max_tokens: 900,
+          max_tokens: mode === 'find' ? 2200 : 900,
           response_format: { type: 'json_object' },
           // OpenRouter returns exact cost when usage accounting is requested.
           ...(provider === 'openrouter' ? { usage: { include: true } } : {}),

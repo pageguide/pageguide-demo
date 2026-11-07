@@ -37,7 +37,9 @@ const QUOTE_RE = (q: string) => {
 // badge + scroll), or null if the quote wasn't found (caller then marks the whole block).
 function markSpan(el: Element, quote: string, emphasis: string | undefined, focused: boolean): Element | null {
   const d = el.ownerDocument;
-  const walker = d.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  const walker = d.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+    acceptNode: node => node.parentElement?.closest('style,script,noscript,template') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
+  });
   const nodes: { node: Text; start: number; len: number }[] = [];
   let full = '';
   let n: Node | null;

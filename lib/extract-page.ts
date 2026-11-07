@@ -1,7 +1,15 @@
 import * as cheerio from 'cheerio';
+import type { AnyNode } from 'domhandler';
 import type { Block, BlockType, PageDoc } from './types';
 
 const clean = (text: string | undefined | null) => (text || '').replace(/\s+/g, ' ').trim().slice(0, 4000);
+
+/** Read article text without treating embedded styles as prose; leave the DOM untouched. */
+function articleText(node: AnyNode): string {
+  if (node.type === 'text') return node.data;
+  if ('tagName' in node && /^(style|script|noscript|template)$/i.test(node.tagName)) return '';
+  return 'children' in node ? node.children.map(articleText).join('') : '';
+}
 
 /** Keep original HTML/CSS; tag source elements for grounding. Never reconstruct the website. */
 export function extractPage(html: string, base: URL): PageDoc {
@@ -42,19 +50,20 @@ export function extractPage(html: string, base: URL): PageDoc {
     const node = $(el);
     if (node.closest(CHROME).length) return;
     const tag = (el as { tagName?: string }).tagName?.toLowerCase() || '';
+    const text = articleText(el);
     let id: string | undefined;
-    if (/^h[1-6]$/.test(tag)) id = push('heading', node.text(), { level: Number(tag[1]) });
-    else if (tag === 'p') id = push('paragraph', node.text());
+    if (/^h[1-6]$/.test(tag)) id = push('heading', text, { level: Number(tag[1]) });
+    else if (tag === 'p') id = push('paragraph', text);
     else if (tag === 'li') {
-      if (!(node.children('a').length && node.text().trim() === node.children('a').text().trim())) id = push('listitem', node.text());
-    } else if (tag === 'blockquote') id = push('quote', node.text());
+      if (!(node.children('a').length && text.trim() === node.children('a').toArray().map(articleText).join('').trim())) id = push('listitem', text);
+    } else if (tag === 'blockquote') id = push('quote', text);
     else if (tag === 'a') {
       if (node.closest('p,li,h1,h2,h3,h4,h5,h6,blockquote').length) return;
       try {
         const href = new URL(node.attr('href') || '', base).href;
-        if (/^https?:/.test(href)) id = push('link', node.text() || node.attr('aria-label') || node.attr('title') || '', { href, control: true });
+        if (/^https?:/.test(href)) id = push('link', text || node.attr('aria-label') || node.attr('title') || '', { href, control: true });
       } catch { /* invalid link */ }
-    } else if (tag === 'button' || node.attr('role') === 'button') id = push('button', node.text() || node.attr('aria-label') || '', { control: true });
+    } else if (tag === 'button' || node.attr('role') === 'button') id = push('button', text || node.attr('aria-label') || '', { control: true });
     else if (['input', 'textarea', 'select'].includes(tag)) id = push('input', `${node.attr('aria-label') || node.attr('placeholder') || node.attr('name') || node.attr('type') || tag} field`, { control: true });
     else if (tag === 'img' && images < 12) {
       const raw = node.attr('src') || node.attr('data-src') || '';
@@ -65,7 +74,7 @@ export function extractPage(html: string, base: URL): PageDoc {
         const w = parseInt(node.attr('width') || '0', 10), h = parseInt(node.attr('height') || '0', 10);
         if ((w && w < 80) || (h && h < 80)) return;
         images++;
-        id = push('image', clean(node.attr('alt')) || clean(node.closest('figure').find('figcaption').text()) || 'Figure', { src });
+        id = push('image', clean(node.attr('alt')) || clean(node.closest('figure').find('figcaption').toArray().map(articleText).join('')) || 'Figure', { src });
       } catch { /* invalid image */ }
     }
     if (id) node.attr('data-pg-id', id);

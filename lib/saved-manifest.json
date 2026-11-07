@@ -1,22 +1,22 @@
 {
   "ronaldo": {
-    "version": "45c77e1a8bba8f08",
+    "version": "9e6636f9eb677d7d",
     "sourceFile": "save-webpage/Cristiano Ronaldo - Wikipedia (11_6_2026 12：54：39 PM).html",
-    "bytes": 1247443
+    "bytes": 1245822
   },
   "facebook": {
-    "version": "6be7124b7d962bb6",
+    "version": "91a676448b6d3348",
     "sourceFile": "save-webpage/Facebook - Wikipedia (11_6_2026 12：54：36 PM).html",
-    "bytes": 730897
+    "bytes": 729075
   },
   "united-states": {
-    "version": "2e41d78f40acb386",
+    "version": "a77db3f7f05f05bb",
     "sourceFile": "save-webpage/United States - Wikipedia (11_6_2026 12：54：35 PM).html",
-    "bytes": 1930845
+    "bytes": 1927748
   },
   "bible": {
-    "version": "35dd1fd9a83e26b7",
+    "version": "57b7f93f251ea7cb",
     "sourceFile": "save-webpage/Bible - Wikipedia (11_6_2026 12：54：18 PM).html",
-    "bytes": 1566501
+    "bytes": 1563450
   }
 }
