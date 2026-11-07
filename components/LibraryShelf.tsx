@@ -22,10 +22,10 @@ const GUIDE_SITES: { id: SandboxSite; name: string; description: string }[] = [
 ];
 
 export const FIND_PROMPTS: Record<string, string[]> = {
-  'ronaldo': ['How did Ronaldo evolve from a winger into a goalscorer?', 'Can you summarize the early life of Ronaldo?', 'What major trophies has Ronaldo won in his career?'],
-  'facebook': ['What is the early story of Facebook?', 'What happened in the Cambridge Analytica scandal?', 'How does Facebook make money?'],
-  'united-states': ['How did the United States expand across North America?', 'How do the US government’s checks and balances work?', 'Why does the United States have such diverse climates?'],
-  'bible': ['Why do different Christian traditions have different numbers of biblical books?', 'Which languages were the biblical texts originally written in?', 'What do the Dead Sea Scrolls reveal about the history of the Bible?'],
+  'ronaldo': ['Can you summarize the early life of Ronaldo?', 'How did Ronaldo evolve from a winger into a goalscorer?', 'How do Ronaldo’s achievements at Manchester United, Real Madrid, Juventus, and Portugal compare?'],
+  'facebook': ['How did Facebook grow from a Harvard student project into a global social network?', 'How did the Cambridge Analytica scandal unfold, and what legal, political, and reputational consequences followed?', 'What major controversies has Facebook faced over privacy, misinformation, political influence, harmful content, and competition, and how has it responded?'],
+  'united-states': ['How did the United States grow from thirteen colonies into a continental and global power?', 'How do the Constitution, federalism, and separation of powers shape the US government?', 'How have immigration, religion, and regional differences shaped American culture?'],
+  'bible': ['How did the Bible take shape over time, from oral traditions and separate writings to the collections read today?', 'How did the Bible’s original languages, major translations, and printing history help it reach new audiences?', 'How has the Bible influenced politics, social reform, literature, and the arts?'],
 };
 
 export default function LibraryShelf() {

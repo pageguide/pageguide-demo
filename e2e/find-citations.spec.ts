@@ -31,7 +31,7 @@ test('unverified claims stay visible and are labeled instead of silently deleted
     { text: 'Unverified claim.', markers: ['missing'] },
     { text: 'Partially sourced claim.', markers: ['1', 'missing'] },
   ], '', new Set(['1']));
-  expect(answer).toBe('Supported claim. [1] Unverified claim. (Source not verified.) Partially sourced claim. [1] (Source not verified.)');
+  expect(answer).toBe('Supported claim. [1] Unverified claim. (Source not verified.) Partially sourced claim. [1] (Additional source not verified.)');
 });
 
 test('repair rejects different facts and ambiguous reassignment', () => {

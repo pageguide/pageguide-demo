@@ -13,7 +13,8 @@ export function composeFindAnswer(claims: unknown, fallback: string, allowed: Se
     const markers = [...new Set<string>(requested.filter((m: unknown): m is string => typeof m === 'string' && allowed.has(m)))];
     // Preserve the model's answer, but never present a failed source check as verified.
     const unverified = requested.some((marker: unknown) => typeof marker !== 'string' || !allowed.has(marker));
-    return [`${text}${markers.length ? ' ' + markers.map((m) => `[${m}]`).join(' ') : ''}${unverified ? ' (Source not verified.)' : ''}`];
+    const warning = unverified ? (markers.length ? ' (Additional source not verified.)' : ' (Source not verified.)') : '';
+    return [`${text}${markers.length ? ' ' + markers.map((m) => `[${m}]`).join(' ') : ''}${warning}`];
   });
   return parts.join(' ').slice(0, 4000) || 'I couldn’t verify an answer in the provided page passages.';
 }
